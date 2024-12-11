@@ -1,0 +1,30 @@
+import torch
+import dq_mult_extension
+import time
+import dq_torch
+from dqrobotics import DQ
+a = torch.tensor([1.0, 0.0, 0.0, 0.0, 0, 0.2, 0.4, 0.5], dtype=torch.float32, device='cuda:0').repeat(1,1)
+from dqrobotics import DQ
+dq_robotics_a = DQ(1.0, 0.0, 0.0, 0.0, 0, 0.2, 0.4, 0.5)
+print("dq_robotics_a: ", dq_robotics_a.translation())
+print("torch_a: ", dq_torch.translation(a))
+print("extension_a: ", dq_mult_extension.translation(a))
+
+# test cuda dq
+a = torch.tensor([1.0, 0.0, 0.0, 0.0, 0, 0.2, 0.4, 0.5], dtype=torch.float32, device='cuda:0').repeat(10000,1)
+dq_mult_extension.translation(a)
+dq_mult_extension.translation(a)
+start = time.time()
+for i in range(1000):
+    dq_mult_extension.translation(a)
+print(time.time()-start)
+## test dq_torch
+dq_torch.translation(a)
+dq_torch.translation(a)
+start = time.time()
+for i in range(1000):
+    dq_torch.translation(a)
+print(time.time()-start)
+for i in range(10000000):
+    dq_robotics_a.translation()
+print(time.time()-start)

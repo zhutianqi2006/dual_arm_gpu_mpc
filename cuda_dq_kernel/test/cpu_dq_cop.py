@@ -1,0 +1,47 @@
+import numpy as np
+from dqrobotics import i_, j_, k_, E_, DQ, vec8 ,vec4
+from dqrobotics.robot_modeling import DQ_SerialManipulatorDH, DQ_CooperativeDualTaskSpace
+from math import pi
+import time
+
+ur3_dh_theta = np.array([0.5, 0.5, 0.5 ,0.5, 0.5, 0.5]) # DH Joint angles (theta)
+ur3_dh_d = np.array([0.0, 0.0, 0.0 ,0.0, 0.0, 0.0 ]) # DH Link offsets (d)
+ur3_dh_a = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1]) # DH Link lengths (a)
+ur3_dh_alpha = np.array([0, 0, 0, 0, 0, 0]) # DH Link twists (alpha)
+ur3_dh_type = np.array([0, 0, 0, 0, 0, 0]) # Joint types (0 for revolute)
+ur3_dh_matrix = np.array([ur3_dh_theta, ur3_dh_d, ur3_dh_a, ur3_dh_alpha, ur3_dh_type])
+ur3_robot = DQ_SerialManipulatorDH(ur3_dh_matrix)
+
+ur3e_dh_theta = np.array([0.5, 0.5, 0.5 ,0.5,0.5,0.5]) # DH Joint angles (theta)
+ur3e_dh_d = np.array([0.0, 0.0, 0.0 ,0.0,0.0,0.0 ]) # DH Link offsets (d)
+ur3e_dh_a = np.array([0.1, 0.1, 0.1, 0.1,0.1,0.1]) # DH Link lengths (a)
+ur3e_dh_alpha = np.array([0, 0, 0, 0, 0, 0]) # DH Link twists (alpha)
+ur3e_dh_type = np.array([0, 0, 0, 0, 0, 0]) # Joint types (0 for revolute)
+ur3e_dh_matrix = np.array([ur3e_dh_theta, ur3e_dh_d, ur3e_dh_a, ur3e_dh_alpha, ur3e_dh_type])
+ur3e_robot = DQ_SerialManipulatorDH(ur3_dh_matrix)
+ur3_base = DQ(1, 0, 0, 0, 0, 0, 0, 0)
+ur3_robot = DQ_SerialManipulatorDH(ur3_dh_matrix)
+ur3_robot.set_base_frame(ur3_base)
+ur3_robot.set_reference_frame(ur3_base)
+ur3e_robot.set_base_frame(ur3_base)
+ur3e_robot.set_reference_frame(ur3_base)
+dq_dual_arm_model = DQ_CooperativeDualTaskSpace(ur3_robot, ur3e_robot)
+dual_arm_joint_pos = np.array([0.5, 0.5, 0.5 ,0.5,0.5,0.5,0.5, 0.5, 0.5 ,0.5,0.5,0.5]) # Joint angles (theta)
+dq_dual_arm_model.relative_pose(dual_arm_joint_pos)
+dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
+# print(dq_dual_arm_model.relative_pose(dual_arm_joint_pos))
+print("jacobian")
+start_time = time.time()
+for i in range(200000):
+    dq_dual_arm_model.relative_pose(dual_arm_joint_pos)
+    dq_dual_arm_model.absolute_pose(dual_arm_joint_pos)
+    dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
+end_time = time.time()
+print("Time taken: ", end_time - start_time)
+# print(dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos))
+# print(dq_dual_arm_model.absolute_pose(dual_arm_joint_pos))
+# start_time = time.time()
+# # end_time = time.time()
+# # print("Time taken: ", end_time - start_time)
+ur3_joint_theta = np.array([0.5, 0.5,0.5,0.5,0.5,0.5]) # Joint angles (theta)
+# print(ur3_robot.fkm(ur3_joint_theta).conj().hamiplus8())

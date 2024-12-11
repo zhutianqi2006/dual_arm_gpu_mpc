@@ -1,0 +1,998 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot name="dual_arm_model_new">
+  <joint name="base_fixture_j_base_link" type="fixed">
+    <origin xyz="0. -0.09 0.235" rpy="0. 1.0472 -1.5708"/>
+    <parent link="base_fixture_link"/>
+    <child link="base_link"/>
+  </joint>
+  <joint name="base_fixture_j_base_link1" type="fixed">
+    <origin xyz="0. 0.09 0.235" rpy="-0. -1.0472 -1.5708"/>
+    <parent link="base_fixture_link"/>
+    <child link="base_link1"/>
+  </joint>
+  <joint name="base_link_base_fixed_joint" type="fixed">
+    <origin xyz="0. 0. 0." rpy="0. 0. -3.1415925"/>
+    <parent link="base_link"/>
+    <child link="base"/>
+  </joint>
+  <joint name="base_link_base_fixed_joint1" type="fixed">
+    <origin xyz="0. 0. 0." rpy="0. 0. -3.1415925"/>
+    <parent link="base_link1"/>
+    <child link="base1"/>
+  </joint>
+  <joint name="base_link_base_link_inertia1" type="fixed">
+    <origin xyz="0. 0. 0." rpy="0. 0. -3.1415925"/>
+    <parent link="base_link1"/>
+    <child link="base_link_inertia1"/>
+  </joint>
+  <joint name="ee_fixed_joint" type="fixed">
+    <origin xyz="0. 0.0819 0. " rpy="0. 0. 1.5707964"/>
+    <parent link="wrist_3_link"/>
+    <child link="ee_link"/>
+  </joint>
+  <joint name="elbow_joint" type="revolute">
+    <origin xyz="0. -0.0925 0.24365" rpy="0. 0. 0."/>
+    <parent link="upper_arm_link"/>
+    <child link="forearm_link"/>
+    <axis xyz="0. 1. 0."/>
+    <limit lower="-6.2831853" upper="3.1415927" effort="150." velocity="3.15"/>
+  </joint>
+  <joint name="elbow_joint1" type="revolute">
+    <origin xyz="-0.24355 0. 0. " rpy="0. 0. 0."/>
+    <parent link="upper_arm_link1"/>
+    <child link="forearm_link1"/>
+    <axis xyz="0. 0. 1."/>
+    <limit lower="-6.2831853" upper="6.2831853" effort="28." velocity="3.1415927"/>
+  </joint>
+  <joint name="flange_tool0" type="fixed">
+    <origin xyz="0. 0. 0." rpy="1.5707964 0. 1.5707964"/>
+    <parent link="flange"/>
+    <child link="tool0"/>
+  </joint>
+  <joint name="flange_tool01" type="fixed">
+    <origin xyz="0. 0. 0." rpy="1.5707964 0. 1.5707964"/>
+    <parent link="flange1"/>
+    <child link="tool01"/>
+  </joint>
+  <joint name="root_joint" type="fixed">
+    <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+    <parent link="Root"/>
+    <child link="base_fixture_link"/>
+  </joint>
+  <joint name="shoulder_lift_joint" type="revolute">
+    <origin xyz="0. 0.1198 0. " rpy="0. 1.5707963 0. "/>
+    <parent link="shoulder_link"/>
+    <child link="upper_arm_link"/>
+    <axis xyz="0. 1. 0."/>
+    <limit lower="-6.2831853" upper="6.2831853" effort="330." velocity="2.1600001"/>
+  </joint>
+  <joint name="shoulder_lift_joint1" type="revolute">
+    <origin xyz="0. 0. 0." rpy="1.5707964 0. 0. "/>
+    <parent link="shoulder_link1"/>
+    <child link="upper_arm_link1"/>
+    <axis xyz="0. 0. 1."/>
+    <limit lower="-6.2831853" upper="6.2831853" effort="56." velocity="3.1415927"/>
+  </joint>
+  <joint name="shoulder_pan_joint" type="revolute">
+    <origin xyz="0. 0. 0.1519" rpy="0. 0. 0."/>
+    <parent link="base_link"/>
+    <child link="shoulder_link"/>
+    <axis xyz="0. 0. 1."/>
+    <limit lower="-6.2831853" upper="6.2831853" effort="330." velocity="2.1600001"/>
+  </joint>
+  <joint name="shoulder_pan_joint1" type="revolute">
+    <origin xyz="0. 0. 0.15185" rpy="0. 0. 0."/>
+    <parent link="base_link_inertia1"/>
+    <child link="shoulder_link1"/>
+    <axis xyz="0. 0. 1."/>
+    <limit lower="-6.2831853" upper="6.2831853" effort="56." velocity="3.1415927"/>
+  </joint>
+  <joint name="wrist_1_joint" type="revolute">
+    <origin xyz="0. 0. 0.21325" rpy="0. 1.5707963 0. "/>
+    <parent link="forearm_link"/>
+    <child link="wrist_1_link"/>
+    <axis xyz="0. 1. 0."/>
+    <limit lower="-6.2831853" upper="6.2831853" effort="54." velocity="3.2"/>
+  </joint>
+  <joint name="wrist_1_joint1" type="revolute">
+    <origin xyz="-0.2132 0. 0.13105" rpy="0. 0. 0."/>
+    <parent link="forearm_link1"/>
+    <child link="wrist_1_link1"/>
+    <axis xyz="0. 0. 1."/>
+    <limit lower="-6.2831853" upper="6.2831853" effort="12." velocity="6.2831853"/>
+  </joint>
+  <joint name="wrist_2_joint" type="revolute">
+    <origin xyz="0. 0.08505 0. " rpy="0. 0. 0."/>
+    <parent link="wrist_1_link"/>
+    <child link="wrist_2_link"/>
+    <axis xyz="0. 0. 1."/>
+    <limit lower="-6.2831853" upper="6.2831853" effort="54." velocity="3.2"/>
+  </joint>
+  <joint name="wrist_2_joint1" type="revolute">
+    <origin xyz="0. -0.08535 -0. " rpy="1.5707964 0. 0. "/>
+    <parent link="wrist_1_link1"/>
+    <child link="wrist_2_link1"/>
+    <axis xyz="0. 0. 1."/>
+    <limit lower="-6.2831853" upper="6.2831853" effort="12." velocity="6.2831853"/>
+  </joint>
+  <joint name="wrist_3_flange" type="fixed">
+    <origin xyz="0. 0. 0." rpy="-1.5707964 -1.5707964 0. "/>
+    <parent link="wrist_3_link"/>
+    <child link="flange"/>
+  </joint>
+  <joint name="wrist_3_flange1" type="fixed">
+    <origin xyz="0. 0. 0." rpy="-1.5707964 -1.5707964 0. "/>
+    <parent link="wrist_3_link1"/>
+    <child link="flange1"/>
+  </joint>
+  <joint name="wrist_3_joint" type="revolute">
+    <origin xyz="0. 0. 0.08535" rpy="0. 0. 0."/>
+    <parent link="wrist_2_link"/>
+    <child link="wrist_3_link"/>
+    <axis xyz="0. 1. 0."/>
+    <limit lower="-6.2831853" upper="6.2831853" effort="54." velocity="3.2"/>
+  </joint>
+  <joint name="wrist_3_joint1" type="revolute">
+    <origin xyz="0. 0.0921 -0. " rpy="-1.5707964 -0.0000001 0.0000001"/>
+    <parent link="wrist_2_link1"/>
+    <child link="wrist_3_link1"/>
+    <axis xyz="0. 0. 1."/>
+    <limit lower="-6.2831853" upper="6.2831853" effort="12." velocity="6.2831853"/>
+  </joint>
+  <link name="Root"/>
+  <link name="base">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.000001"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+  </link>
+  <link name="base1">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.000001"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+  </link>
+  <link name="base_fixture_link"/>
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2."/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/base_link_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/base_link_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="base_link1">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.000001"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+  </link>
+  <link name="base_link_inertia1">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2."/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. -3.1415925"/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/visual/base.dae" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. -3.1415925"/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/collision/base.stl" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="ee_link">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.000001"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.01 0. 0. " rpy="0. 0. 0."/>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.01 0. 0. " rpy="0. 0. 0."/>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="flange">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.000001"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+  </link>
+<material name="LightGrey">
+    <color rgba="0.7 0.7 0.7 1.0"/>
+</material>
+
+<link name="flange1">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.000001"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0.0242436 -0.0438991 0.0062681" rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/PGI_140_80_W_S_finger_part_1_____________3_2_Mesh_0.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0232264 -0.0779881 0.0034687" rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/PGI_140_80_W_S_finger_part_1_NONE_3_Mesh_1.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0242436 0.0331808 -0.0024476" rpy="-3.1415927 0. 1.5707963"/>
+      <geometry>
+        <mesh filename="meshes/PGI_140_80_W_S_finger_part_4_____________3_2_Mesh_0.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0253243 0.0693999 0.0005267" rpy="-3.1415927 0. 1.5707963"/>
+      <geometry>
+        <mesh filename="meshes/PGI_140_80_W_S_finger_part_4_NONE_3_Mesh_1.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/NONE_6_Mesh_2.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_3.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_4.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_5.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_6.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_7.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_8.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_9.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_10.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_11.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_12.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/NONE_17_Mesh_13.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/NONE_18_Mesh_14.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/NONE_19_Mesh_15.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/NONE_20_Mesh_16.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_17.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_18.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_19.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_20.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_21.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_22.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_23.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_24.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_25.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_26.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_27.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_28.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_29.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_30.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_31.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_32.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_33.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0257436 -0.0438991 0.0062681" rpy="-1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/Mesh_34.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.3018072 -0.0136545 0.0148756" rpy="1.5707964 0. -0.0349049"/>
+      <geometry>
+        <mesh filename="meshes/plane_node__mesh_.obj" scale="1.05 1. 1. "/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.2958951 -0.0129789 0.0094272" rpy="1.6057012 1.5707964 0. "/>
+      <geometry>
+        <mesh filename="meshes/bottle_node__mesh_.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+</link>
+
+
+  <link name="forearm_link">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="1.26"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. -0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/forearm_link_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/forearm_link_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="forearm_link1">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="1.26"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0.027" rpy="1.5707964 -0.0000001 -1.5707965"/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/visual/forearm.dae" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+      <origin xyz="0. 0. 0.027" rpy="1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/collision/forearm.stl" scale="1. 1. 1."/>
+      </geometry>
+    <collision>
+      <origin xyz="0. 0. 0.027" rpy="1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/collision/forearm.stl" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="shoulder_link">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2."/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. -0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/shoulder_link_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/shoulder_link_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="shoulder_link1">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2."/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="-0. 0. -0.0000001" rpy="0. -0.0000002 -3.1415925"/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/visual/shoulder.dae" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. -3.1415925"/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/collision/shoulder.stl" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="tool0">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.000001"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+  </link>
+  <link name="tool01">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.000001"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+  </link>
+  <link name="upper_arm_link">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="3.4200001"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0.0000001" rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/upper_arm_link_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/upper_arm_link_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="upper_arm_link1">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="3.4200001"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. -0.0000001 0.12 " rpy="1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/visual/upperarm.dae" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0.12" rpy="1.5707964 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/collision/upperarm.stl" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="wrist_1_link">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.8"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. -0. 0.0000001" rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/wrist_1_link_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/wrist_1_link_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="wrist_1_link1">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.8"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.0000008 0.0000007 -0.1039999" rpy="1.5707964 -0.0000001 0. "/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/visual/wrist1.dae" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. -0.104" rpy="1.5707964 0. 0. "/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/collision/wrist1.stl" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="wrist_2_link">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.8"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="-0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/wrist_2_link_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/wrist_2_link_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="wrist_2_link1">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.8"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.0000001 0. -0.08535 " rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/visual/wrist2.dae" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0000001 0. -0.08535 " rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/collision/wrist2.stl" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="wrist_3_link">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.35"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="-0. -0.000779 0. " rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="meshes/wrist_3_link_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="meshes/wrist_3_link_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.0001776 0.163233 -0.0029456" rpy="0. 1.492921 0. "/>
+      <geometry>
+        <mesh filename="meshes/_101920_1_CirPattern1_2_Mesh_0.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.0001776 0.163233 -0.0029456" rpy="3.1415927 -0.329281 -3.1415927"/>
+      <geometry>
+        <mesh filename="meshes/_101920_3_CirPattern1_2_Mesh_0.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.0001776 0.163233 -0.0029456" rpy="3.1415927 -1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/Chamfer1_5_Mesh_1.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.0001776 0.163233 -0.0029456" rpy="0. 0. -3.1415927"/>
+      <geometry>
+        <mesh filename="meshes/Boss_Extrude9_7_Mesh_2.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0113084 0.1632959 -0.0021667" rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="meshes/_105911_79_Split_Line1_80_Mesh_13.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.0001776 0.163233 -0.0029456" rpy="0. -1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/_105961_Mounted_81_Fillet7_82_Mesh_14.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.0001776 0.163233 -0.0029456" rpy="0. -1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/_105961_Mounted_83_Fillet7_82_Mesh_14.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.0001776 0.163233 -0.0029456" rpy="0. 1.5250294 0. "/>
+      <geometry>
+        <mesh filename="meshes/_101920_84_CirPattern1_2_Mesh_0.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.0001748 0.1680574 -0.0029651" rpy="-3.1415927 0. -3.1415927"/>
+      <geometry>
+        <mesh filename="meshes/Fillet220_86_Mesh_15.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.0001776 0.163233 -0.0029456" rpy="3.1415927 0. 0. "/>
+      <geometry>
+        <mesh filename="meshes/Cut_Extrude4_88_Mesh_16.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.002519 0.1632477 -0.0027627" rpy="3.1415927 0. 3.1415927"/>
+      <geometry>
+        <mesh filename="meshes/_105911_89_Split_Line1_80_Mesh_13.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.0001776 0.163233 -0.0029456" rpy="0. 0.4620416 0. "/>
+      <geometry>
+        <mesh filename="meshes/_101920_90_CirPattern1_2_Mesh_0.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="meshes/wrist_3_link_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="wrist_3_link1">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.35"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. -0. -0.0921" rpy="1.5707964 0. 0.0000001"/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/visual/wrist3.dae" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. -0.0921" rpy="1.5707964 0. 0. "/>
+      <geometry>
+        <mesh filename="package://dual_arm_model_new/meshes/collision/wrist3.stl" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+</robot>

@@ -1,0 +1,862 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot name="dual_panda_urdf">
+  <joint name="left_panda_fr3_hand_fr3_finger_joint1" type="prismatic">
+    <origin xyz="0. 0. 0.0584" rpy="0. 0. 1.5707964"/>
+    <parent link="left_panda_fr3_hand"/>
+    <child link="left_panda_fr3_leftfinger"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="0." upper="0.04" effort="100." velocity="0.2"/>
+  </joint>
+  <joint name="left_panda_fr3_hand_fr3_finger_joint2" type="prismatic">
+    <origin xyz="0. 0. 0.0584" rpy="0. 0. -1.5707964"/>
+    <parent link="left_panda_fr3_hand"/>
+    <child link="left_panda_fr3_rightfinger"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="0." upper="0.04" effort="100." velocity="0.2"/>
+  </joint>
+  <joint name="left_panda_fr3_hand_fr3_hand_tcp_joint" type="fixed">
+    <origin xyz="0. 0. 0.1034" rpy="0. 0. 0."/>
+    <parent link="left_panda_fr3_hand"/>
+    <child link="left_panda_fr3_hand_tcp"/>
+  </joint>
+  <joint name="left_panda_fr3_link0_fr3_joint1" type="revolute">
+    <origin xyz="0. 0. 0.333" rpy="0. -1.5707963 0. "/>
+    <parent link="left_panda_fr3_link0"/>
+    <child link="left_panda_fr3_link1"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="-2.7436999" upper="2.7436999" effort="87." velocity="2.6199998"/>
+  </joint>
+  <joint name="left_panda_fr3_link1_fr3_joint2" type="revolute">
+    <origin xyz="0. 0. 0." rpy="0. 0. 1.5707964"/>
+    <parent link="left_panda_fr3_link1"/>
+    <child link="left_panda_fr3_link2"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="-1.7836916" upper="1.7836999" effort="87." velocity="2.6199998"/>
+  </joint>
+  <joint name="left_panda_fr3_link2_fr3_joint3" type="revolute">
+    <origin xyz="0. -0.316 0. " rpy="0. 0. -1.5707964"/>
+    <parent link="left_panda_fr3_link2"/>
+    <child link="left_panda_fr3_link3"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="-2.9006999" upper="2.9006999" effort="87." velocity="2.6199998"/>
+  </joint>
+  <joint name="left_panda_fr3_link3_fr3_joint4" type="revolute">
+    <origin xyz="0. 0. -0.0825" rpy="0. 0. -1.5707964"/>
+    <parent link="left_panda_fr3_link3"/>
+    <child link="left_panda_fr3_link4"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="-3.0420914" upper="-0.1518" effort="87." velocity="2.6199998"/>
+  </joint>
+  <joint name="left_panda_fr3_link4_fr3_joint5" type="revolute">
+    <origin xyz="0. 0.384 0.0825" rpy="0. 0. 1.5707964"/>
+    <parent link="left_panda_fr3_link4"/>
+    <child link="left_panda_fr3_link5"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="-2.8064999" upper="2.8065068" effort="12." velocity="5.2600004"/>
+  </joint>
+  <joint name="left_panda_fr3_link5_fr3_joint6" type="revolute">
+    <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
+    <parent link="left_panda_fr3_link5"/>
+    <child link="left_panda_fr3_link6"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="0.5445" upper="4.5168948" effort="12." velocity="4.1799999"/>
+  </joint>
+  <joint name="left_panda_fr3_link6_fr3_joint7" type="revolute">
+    <origin xyz="0. 0. -0.088" rpy="0. 0. -1.5707964"/>
+    <parent link="left_panda_fr3_link6"/>
+    <child link="left_panda_fr3_link7"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="-3.0158997" upper="3.0158941" effort="12." velocity="5.2600004"/>
+  </joint>
+  <joint name="left_panda_fr3_link7_fr3_joint8" type="fixed">
+    <origin xyz="0.107 0. 0. " rpy="0. 1.5707963 0. "/>
+    <parent link="left_panda_fr3_link7"/>
+    <child link="left_panda_fr3_link8"/>
+  </joint>
+  <joint name="left_panda_fr3_link8_fr3_hand_joint" type="fixed">
+    <origin xyz="0. 0. 0." rpy="0. 0. -0.7853982"/>
+    <parent link="left_panda_fr3_link8"/>
+    <child link="left_panda_fr3_hand"/>
+  </joint>
+  <joint name="left_panda_root_joint" type="fixed">
+    <origin xyz="0. -0.35 -0. " rpy="0. 0. 0."/>
+    <parent link="Root"/>
+    <child link="left_panda_fr3_link0"/>
+  </joint>
+  <joint name="right_panda_fr3_hand_fr3_finger_joint1" type="prismatic">
+    <origin xyz="0. 0. 0.0584" rpy="0. 0. 1.5707964"/>
+    <parent link="right_panda_fr3_hand"/>
+    <child link="right_panda_fr3_leftfinger"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="0." upper="0.04" effort="100." velocity="0.2"/>
+  </joint>
+  <joint name="right_panda_fr3_hand_fr3_finger_joint2" type="prismatic">
+    <origin xyz="0. 0. 0.0584" rpy="0. 0. -1.5707964"/>
+    <parent link="right_panda_fr3_hand"/>
+    <child link="right_panda_fr3_rightfinger"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="0." upper="0.04" effort="100." velocity="0.2"/>
+  </joint>
+  <joint name="right_panda_fr3_hand_fr3_hand_tcp_joint" type="fixed">
+    <origin xyz="0. 0. 0.1034" rpy="0. 0. 0."/>
+    <parent link="right_panda_fr3_hand"/>
+    <child link="right_panda_fr3_hand_tcp"/>
+  </joint>
+  <joint name="right_panda_fr3_link0_fr3_joint1" type="revolute">
+    <origin xyz="0. 0. 0.333" rpy="0. -1.5707963 0. "/>
+    <parent link="right_panda_fr3_link0"/>
+    <child link="right_panda_fr3_link1"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="-2.7436999" upper="2.7436999" effort="87." velocity="2.6199998"/>
+  </joint>
+  <joint name="right_panda_fr3_link1_fr3_joint2" type="revolute">
+    <origin xyz="0. 0. 0." rpy="0. 0. 1.5707964"/>
+    <parent link="right_panda_fr3_link1"/>
+    <child link="right_panda_fr3_link2"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="-1.7836916" upper="1.7836999" effort="87." velocity="2.6199998"/>
+  </joint>
+  <joint name="right_panda_fr3_link2_fr3_joint3" type="revolute">
+    <origin xyz="0. -0.316 0. " rpy="0. 0. -1.5707964"/>
+    <parent link="right_panda_fr3_link2"/>
+    <child link="right_panda_fr3_link3"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="-2.9006999" upper="2.9006999" effort="87." velocity="2.6199998"/>
+  </joint>
+  <joint name="right_panda_fr3_link3_fr3_joint4" type="revolute">
+    <origin xyz="0. 0. -0.0825" rpy="0. 0. -1.5707964"/>
+    <parent link="right_panda_fr3_link3"/>
+    <child link="right_panda_fr3_link4"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="-3.0420914" upper="-0.1518" effort="87." velocity="2.6199998"/>
+  </joint>
+  <joint name="right_panda_fr3_link4_fr3_joint5" type="revolute">
+    <origin xyz="0. 0.384 0.0825" rpy="0. 0. 1.5707964"/>
+    <parent link="right_panda_fr3_link4"/>
+    <child link="right_panda_fr3_link5"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="-2.8065068" upper="2.8064999" effort="12." velocity="5.2600004"/>
+  </joint>
+  <joint name="right_panda_fr3_link5_fr3_joint6" type="revolute">
+    <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
+    <parent link="right_panda_fr3_link5"/>
+    <child link="right_panda_fr3_link6"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="0.5445" upper="4.5168948" effort="12." velocity="4.1799999"/>
+  </joint>
+  <joint name="right_panda_fr3_link6_fr3_joint7" type="revolute">
+    <origin xyz="0. 0. -0.088" rpy="0. 0. -1.5707964"/>
+    <parent link="right_panda_fr3_link6"/>
+    <child link="right_panda_fr3_link7"/>
+    <axis xyz="1. 0. 0."/>
+    <limit lower="-3.0158997" upper="3.0158941" effort="12." velocity="5.2600004"/>
+  </joint>
+  <joint name="right_panda_fr3_link7_fr3_joint8" type="fixed">
+    <origin xyz="0.107 0. 0. " rpy="0. 1.5707963 0. "/>
+    <parent link="right_panda_fr3_link7"/>
+    <child link="right_panda_fr3_link8"/>
+  </joint>
+  <joint name="right_panda_fr3_link8_fr3_hand_joint" type="fixed">
+    <origin xyz="0. 0. 0." rpy="0. 0. -0.7853982"/>
+    <parent link="right_panda_fr3_link8"/>
+    <child link="right_panda_fr3_hand"/>
+  </joint>
+  <joint name="right_panda_root_joint" type="fixed">
+    <origin xyz="0. 0.35 -0. " rpy="0. 0. 0."/>
+    <parent link="Root"/>
+    <child link="right_panda_fr3_link0"/>
+  </joint>
+  <link name="Root"/>
+  <link name="left_panda_fr3_hand">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.73"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_hand_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_hand_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_panda_fr3_hand_tcp"/>
+  <link name="left_panda_fr3_leftfinger">
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_leftfinger_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0185 0. 0.011 " rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <box size="0.022 0.015 0.02 "/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0068 0. 0.0022" rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <box size="0.022 0.0088 0.0038"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0159 0. 0.02835" rpy="0.5235989 0. -1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.007 0.0235"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.00758 0. 0.04525" rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.0152 0.0185"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0185 0. 0.011 " rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <box size="0.022 0.015 0.02 "/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.0068 0. 0.0022" rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <box size="0.022 0.0088 0.0038"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.0159 0. 0.02835" rpy="0.5235989 0. -1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.007 0.0235"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.00758 0. 0.04525" rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.0152 0.0185"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_panda_fr3_link0">
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link0_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link0_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_panda_fr3_link1">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2.9274654"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link1_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link1_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_panda_fr3_link2">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2.9355371"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link2_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link2_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_panda_fr3_link3">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2.2449014"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link3_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link3_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_panda_fr3_link4">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2.6155956"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link4_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link4_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_panda_fr3_link5">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2.3271208"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link5_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link5_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_panda_fr3_link6">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="1.8170377"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link6_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link6_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_panda_fr3_link7">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.6271433"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link7_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_link7_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </collision>
+  </link>
+  <link name="left_panda_fr3_link8"/>
+  <link name="left_panda_fr3_rightfinger">
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. -1.5707963"/>
+      <geometry>
+        <mesh filename="meshes/left_panda_fr3_rightfinger_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0185 0. 0.011 " rpy="0. 0. 1.5707964"/>
+      <geometry>
+        <box size="0.022 0.015 0.02 "/>
+      </geometry>
+    </visual>
+    <visual>
+      <origin xyz="0.0068 0. 0.0022" rpy="0. 0. 1.5707964"/>
+      <geometry>
+        <box size="0.022 0.0088 0.0038"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0159 0. 0.02835" rpy="-0.5235989 0. 1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.007 0.0235"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.00758 0. 0.04525" rpy="0. 0. 1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.0152 0.0185"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0185 0. 0.011 " rpy="0. 0. 1.5707964"/>
+      <geometry>
+        <box size="0.022 0.015 0.02 "/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.0068 0. 0.0022" rpy="0. 0. 1.5707964"/>
+      <geometry>
+        <box size="0.022 0.0088 0.0038"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.0159 0. 0.02835" rpy="-0.5235989 0. 1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.007 0.0235"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.00758 0. 0.04525" rpy="0. 0. 1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.0152 0.0185"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_panda_fr3_hand">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.73"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_hand_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0000068 0.0083501 0.2379537" rpy="-1.5707964 -1.5707964 0. "/>
+      <geometry>
+        <mesh filename="meshes/plane_node__mesh_.obj" scale="1.05 1. 1. "/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.0054416 0.0078812 0.2320216" rpy="1.5707964 0. 3.1415927"/>
+      <geometry>
+        <mesh filename="meshes/bottle_node__mesh_.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_hand_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_panda_fr3_hand_tcp"/>
+  <link name="right_panda_fr3_leftfinger">
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_leftfinger_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0185 0. 0.011 " rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <box size="0.022 0.015 0.02 "/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0068 0. 0.0022" rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <box size="0.022 0.0088 0.0038"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0159 0. 0.02835" rpy="0.5235989 0. -1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.007 0.0235"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.00758 0. 0.04525" rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.0152 0.0185"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0185 0. 0.011 " rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <box size="0.022 0.015 0.02 "/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.0068 0. 0.0022" rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <box size="0.022 0.0088 0.0038"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.0159 0. 0.02835" rpy="0.5235989 0. -1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.007 0.0235"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.00758 0. 0.04525" rpy="0. 0. -1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.0152 0.0185"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_panda_fr3_link0">
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link0_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link0_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_panda_fr3_link1">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2.9274654"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link1_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link1_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_panda_fr3_link2">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2.9355371"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link2_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link2_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_panda_fr3_link3">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2.2449014"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link3_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link3_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_panda_fr3_link4">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2.6155956"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link4_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link4_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_panda_fr3_link5">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="2.3271208"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link5_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link5_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_panda_fr3_link6">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="1.8170377"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link6_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link6_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_panda_fr3_link7">
+    <inertial>
+      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <mass value="0.6271433"/>
+      <inertia ixx="0." ixy="0." ixz="0." iyy="0." iyz="0." izz="0."/>
+    </inertial>
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link7_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0. 0. 0." rpy="0. 1.5707963 0. "/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_link7_collisions.obj" scale="1. 1. 1."/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_panda_fr3_link8"/>
+  <link name="right_panda_fr3_rightfinger">
+    <visual>
+      <origin xyz="0. 0. 0." rpy="0. 0. -1.5707963"/>
+      <geometry>
+        <mesh filename="meshes/right_panda_fr3_rightfinger_visuals.obj" scale="1. 1. 1."/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0185 0. 0.011 " rpy="0. 0. 1.5707964"/>
+      <geometry>
+        <box size="0.022 0.015 0.02 "/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0068 0. 0.0022" rpy="0. 0. 1.5707964"/>
+      <geometry>
+        <box size="0.022 0.0088 0.0038"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.0159 0. 0.02835" rpy="-0.5235989 0. 1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.007 0.0235"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.00758 0. 0.04525" rpy="0. 0. 1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.0152 0.0185"/>
+      </geometry>
+      <material name="LightGrey">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0185 0. 0.011 " rpy="0. 0. 1.5707964"/>
+      <geometry>
+        <box size="0.022 0.015 0.02 "/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.0068 0. 0.0022" rpy="0. 0. 1.5707964"/>
+      <geometry>
+        <box size="0.022 0.0088 0.0038"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.0159 0. 0.02835" rpy="-0.5235989 0. 1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.007 0.0235"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.00758 0. 0.04525" rpy="0. 0. 1.5707964"/>
+      <geometry>
+        <box size="0.0175 0.0152 0.0185"/>
+      </geometry>
+    </collision>
+  </link>
+</robot>

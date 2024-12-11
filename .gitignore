@@ -1,3 +1,6 @@
+#
+.vscode/
+.VSCodeCounter/
 # for cuda
 *.i
 *.ii
@@ -86,7 +89,7 @@ helpsearch*/
 # Simulink code generation folders
 slprj/
 sccprj/
-
++bus_conv_fcns/
 # Matlab code generation folders
 codegen/
 
@@ -103,3 +106,4 @@ octave-workspace
 simulink_ros_plot/*.fig
 simulink_ros_plot/*.mat
 simulink_ros_plot/*.svg
+

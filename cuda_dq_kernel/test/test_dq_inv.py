@@ -1,5 +1,4 @@
 import torch
-import dq_mult_extension
 import time
 import dq_torch
 from dqrobotics import DQ
@@ -8,20 +7,3 @@ from dqrobotics import DQ
 dq_robotics_a = DQ(1, 2, 3, 4, 0, 6, 7, 8)
 print("dq_robotics_a: ", dq_robotics_a.inv())
 print("torch_a: ", dq_torch.inv(a))
-print("extension_a: ", dq_mult_extension.dq_inv(a))
-
-# test cuda dq
-a = torch.tensor([1, 2, 3, 4, 0, 6, 7, 8], dtype=torch.float32, device='cuda:0').repeat(1000,1)
-dq_mult_extension.dq_inv(a)
-dq_mult_extension.dq_inv(a)
-start = time.time()
-for i in range(1000):
-    dq_mult_extension.dq_inv(a)
-print(time.time()-start)
-## test dq_torch
-dq_torch.inv(a)
-dq_torch.inv(a)
-start = time.time()
-for i in range(1000):
-    dq_torch.inv(a)
-print(time.time()-start)

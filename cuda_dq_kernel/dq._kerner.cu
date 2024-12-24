@@ -810,9 +810,14 @@ __global__ void conj_kernel(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < N) {
         conj_q[idx][0] = v[idx][0];
-        for (int i = 1; i < 8; i++) {
-            conj_q[idx][i] = -v[idx][i];
-        }
+        conj_q[idx][1] = -v[idx][1];
+        conj_q[idx][2] = -v[idx][2];
+        conj_q[idx][3] = -v[idx][3];
+        // 双四元数的第二部分也需要处理
+        conj_q[idx][4] = v[idx][4];
+        conj_q[idx][5] = -v[idx][5];
+        conj_q[idx][6] = -v[idx][6];
+        conj_q[idx][7] = -v[idx][7];
     }
 }
 
@@ -954,7 +959,7 @@ __global__ void dq_log_kernel(
             results[idx][i] = p[i];
         }
         for (int i = 4; i < 8; i++) {
-            results[idx][i] = d[i];
+            results[idx][i] = d[i-4];
         }
 
     }

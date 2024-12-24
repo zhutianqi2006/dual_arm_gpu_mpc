@@ -34,7 +34,7 @@ robot2_dh_parameters:
   - [0.0, 0.0,   0.088,   1.5708, 0]
 robot2_base: [1.0, 0, 0, 0, 0.0, 0.0, 0.175, 0.0]
 robot2_effector: [1, 0, 0, 0, 0, 0, 0, 0]
-curobo_world_file: 'franka_dynamic_exp1_env.yml'
+curobo_world_file: 'franka_dynamic_exp3_env.yml'
 curobo_robot_file: 'dual_panda_curobo_obstacle.yml'
 high_level_u_topic: '/high_level_u'
 # MPPI parameters

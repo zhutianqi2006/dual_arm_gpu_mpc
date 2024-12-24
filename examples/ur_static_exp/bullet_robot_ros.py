@@ -76,28 +76,29 @@ class DualArmBulletModel(Node):
         # ground plane
         ground_id = pyb.loadURDF("plane.urdf", [0, 0, 0], useFixedBase=True, physicsClientId=client_id)
         dual_arm_robot_id = pyb.loadURDF(
-            "model/dual_arm_model_new/dual_arm_model_new.urdf",
+            "model/dual_arm_model/dual_arm_model.urdf",
             [0, 0, 0],
             useFixedBase=True,
             physicsClientId=client_id
         )
         dual_arm_robot = pyb_utils.Robot(dual_arm_robot_id, client_id=client_id)
         # some cubes for obstacles
-        cube1_id = pyb.loadURDF(
-            "model/plane/plane.urdf", [0.50, 0.02, 0.006], useFixedBase=True, physicsClientId=client_id
-        )
+        # store body indices in a dict with more convenient key names
         cube2_id = pyb.loadURDF(
-            "model/plane/plane.urdf", [0.50, 0.02, 0.206], useFixedBase=True, physicsClientId=client_id
+            "model/plane/thine_plane.urdf", [0.46, 0.0, 0.006], useFixedBase=True, physicsClientId=client_id
         )
         cube3_id = pyb.loadURDF(
-            "model/plane/plane.urdf", [0.50, 0.02, 0.440], useFixedBase=True, physicsClientId=client_id
+            "model/plane/thine_plane.urdf", [0.46, 0.0, 0.256], useFixedBase=True, physicsClientId=client_id
+        )
+        cube4_id = pyb.loadURDF(
+            "model/plane/thine_plane.urdf", [0.46, 0.0, 0.506], useFixedBase=True, physicsClientId=client_id
         )
         # store body indices in a dict with more convenient key names
         obstacles = {
             "ground": ground_id,
-            "cube1": cube1_id,
             "cube2": cube2_id,
             "cube3": cube3_id,
+            "cube4": cube4_id,
         }
         return dual_arm_robot, obstacles
     
@@ -117,11 +118,12 @@ class DualArmBulletModel(Node):
 def main(args=None):
     os.environ['ROS_DOMAIN_ID'] = '16'
     rclpy.init(args=args)
+    # ur3_q = np.array([-1.91668255, -2.30539877, -1.55328495, -1.11481983,  2.02716804, -0.35711939])
+    # ur3e_q = np.array([1.90909815, -0.88395007,  1.61091215, -2.09752192, -2.02674181,  3.44990301])
     ur3_q = np.array([-1.91668255, -2.30539877, -1.55328495, -1.11481983,  2.02716804, -0.35711939])
     ur3e_q = np.array([1.90909815, -0.88395007,  1.61091215, -2.09752192, -2.02674181,  3.44990301])
     dual_arm_model= DualArmBulletModel(ur3_q, ur3e_q, 0.01)
     rclpy.spin(dual_arm_model)
-    
-  
+
 if __name__ == "__main__":
     main()

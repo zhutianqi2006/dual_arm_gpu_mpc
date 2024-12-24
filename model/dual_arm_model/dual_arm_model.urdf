@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<robot name="dual_arm_model_new">
+<robot name="dual_arm_model">
   <joint name="base_fixture_j_base_link" type="fixed">
     <origin xyz="0. -0.09 0.235" rpy="0. 1.0472 -1.5708"/>
     <parent link="base_fixture_link"/>
@@ -164,7 +164,7 @@
     <visual>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/base_link_visuals.obj" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/base_link_visuals.obj" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -173,7 +173,7 @@
     <collision>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/base_link_collisions.obj" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/base_link_collisions.obj" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>
@@ -193,7 +193,7 @@
     <visual>
       <origin xyz="0. 0. 0." rpy="0. 0. -3.1415925"/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/visual/base.dae" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/visual/base.dae" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -202,7 +202,7 @@
     <collision>
       <origin xyz="0. 0. 0." rpy="0. 0. -3.1415925"/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/collision/base.stl" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/collision/base.stl" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>
@@ -605,7 +605,7 @@
     <visual>
       <origin xyz="0. 0. -0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/forearm_link_visuals.obj" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/forearm_link_visuals.obj" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -614,7 +614,7 @@
     <collision>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/forearm_link_collisions.obj" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/forearm_link_collisions.obj" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>
@@ -627,7 +627,7 @@
     <visual>
       <origin xyz="0. 0. 0.027" rpy="1.5707964 -0.0000001 -1.5707965"/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/visual/forearm.dae" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/visual/forearm.dae" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -635,12 +635,12 @@
     </visual>
       <origin xyz="0. 0. 0.027" rpy="1.5707964 0. -1.5707964"/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/collision/forearm.stl" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/collision/forearm.stl" scale="1. 1. 1."/>
       </geometry>
     <collision>
       <origin xyz="0. 0. 0.027" rpy="1.5707964 0. -1.5707964"/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/collision/forearm.stl" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/collision/forearm.stl" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>
@@ -653,7 +653,7 @@
     <visual>
       <origin xyz="0. -0. 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/shoulder_link_visuals.obj" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/shoulder_link_visuals.obj" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -662,7 +662,7 @@
     <collision>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/shoulder_link_collisions.obj" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/shoulder_link_collisions.obj" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>
@@ -675,7 +675,7 @@
     <visual>
       <origin xyz="-0. 0. -0.0000001" rpy="0. -0.0000002 -3.1415925"/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/visual/shoulder.dae" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/visual/shoulder.dae" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -684,7 +684,7 @@
     <collision>
       <origin xyz="0. 0. 0." rpy="0. 0. -3.1415925"/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/collision/shoulder.stl" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/collision/shoulder.stl" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>
@@ -711,7 +711,7 @@
     <visual>
       <origin xyz="0. 0. 0.0000001" rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/upper_arm_link_visuals.obj" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/upper_arm_link_visuals.obj" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -720,7 +720,7 @@
     <collision>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/upper_arm_link_collisions.obj" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/upper_arm_link_collisions.obj" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>
@@ -733,7 +733,7 @@
     <visual>
       <origin xyz="0. -0.0000001 0.12 " rpy="1.5707964 0. -1.5707964"/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/visual/upperarm.dae" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/visual/upperarm.dae" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -742,7 +742,7 @@
     <collision>
       <origin xyz="0. 0. 0.12" rpy="1.5707964 0. -1.5707964"/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/collision/upperarm.stl" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/collision/upperarm.stl" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>
@@ -755,7 +755,7 @@
     <visual>
       <origin xyz="0. -0. 0.0000001" rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/wrist_1_link_visuals.obj" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/wrist_1_link_visuals.obj" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -764,7 +764,7 @@
     <collision>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/wrist_1_link_collisions.obj" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/wrist_1_link_collisions.obj" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>
@@ -777,7 +777,7 @@
     <visual>
       <origin xyz="-0.0000008 0.0000007 -0.1039999" rpy="1.5707964 -0.0000001 0. "/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/visual/wrist1.dae" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/visual/wrist1.dae" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -786,7 +786,7 @@
     <collision>
       <origin xyz="0. 0. -0.104" rpy="1.5707964 0. 0. "/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/collision/wrist1.stl" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/collision/wrist1.stl" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>
@@ -799,7 +799,7 @@
     <visual>
       <origin xyz="-0. 0. 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/wrist_2_link_visuals.obj" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/wrist_2_link_visuals.obj" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -808,7 +808,7 @@
     <collision>
       <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/wrist_2_link_collisions.obj" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/wrist_2_link_collisions.obj" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>
@@ -821,7 +821,7 @@
     <visual>
       <origin xyz="-0.0000001 0. -0.08535 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/visual/wrist2.dae" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/visual/wrist2.dae" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -830,7 +830,7 @@
     <collision>
       <origin xyz="-0.0000001 0. -0.08535 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/collision/wrist2.stl" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/collision/wrist2.stl" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>
@@ -982,7 +982,7 @@
     <visual>
       <origin xyz="0. -0. -0.0921" rpy="1.5707964 0. 0.0000001"/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/visual/wrist3.dae" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/visual/wrist3.dae" scale="1. 1. 1."/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -991,7 +991,7 @@
     <collision>
       <origin xyz="0. 0. -0.0921" rpy="1.5707964 0. 0. "/>
       <geometry>
-        <mesh filename="package://dual_arm_model_new/meshes/collision/wrist3.stl" scale="1. 1. 1."/>
+        <mesh filename="package://dual_arm_model/meshes/collision/wrist3.stl" scale="1. 1. 1."/>
       </geometry>
     </collision>
   </link>

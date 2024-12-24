@@ -62,8 +62,10 @@ class DualArmBulletModel(Node):
             Float64MultiArray, 'moving_obstacle', self.obstacle_callback, 1)
         
     def obstacle_callback(self, msg:Float64MultiArray):
-        cube_id = self.obstacles["cube4"]
-        pyb.resetBasePositionAndOrientation(cube_id, msg.data[0:3], [1,0,0,0])
+        cube4_id = self.obstacles["cube4"]
+        cube5_id = self.obstacles["cube5"]
+        pyb.resetBasePositionAndOrientation(cube4_id, msg.data[0:3], [1,0,0,0])
+        pyb.resetBasePositionAndOrientation(cube5_id, msg.data[3:6], [1,0,0,0])
 
     def franka1_joint_vel_callback(self, msg:JointState):
         self.franka1_current_joint_vel = np.array(msg.velocity[:7])
@@ -85,12 +87,16 @@ class DualArmBulletModel(Node):
         dual_arm_robot = pyb_utils.Robot(dual_arm_robot_id, client_id=client_id)
         # some cubes for obstacles
         cube4_id = pyb.loadURDF(
-            "model/plane/plane.urdf", [0.50, 0.02, 100.440], useFixedBase=True, physicsClientId=client_id
+            "model/plane/plane.urdf", [0.50, 0.0, 0.85], useFixedBase=True, physicsClientId=client_id
+        )
+        cube5_id = pyb.loadURDF(
+            "model/plane/plane.urdf", [0.50, 0.0, 0.85], useFixedBase=True, physicsClientId=client_id
         )
         # store body indices in a dict with more convenient key names
         obstacles = {
             "ground": ground_id,
             "cube4": cube4_id,
+            "cube5": cube5_id,
         }
         pyb.resetDebugVisualizerCamera(
         cameraDistance=1.2,

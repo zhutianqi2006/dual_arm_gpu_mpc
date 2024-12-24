@@ -40,6 +40,8 @@ class LowROSModule(Node):
         self.high_level_u_topic = config.high_level_u_topic
         self.high_level_u = [0.0] * (self.robot1_q_num + self.robot2_q_num)
         self.setup_ros2()
+        # abs error data
+
 
     def read_joint_state(self):
         return self.robot1_q, self.robot2_q
@@ -52,7 +54,13 @@ class LowROSModule(Node):
         self.robot2_dq_msg.velocity = robot2_dq
         self.robot1_pub.publish(self.robot1_dq_msg)
         self.robot2_pub.publish(self.robot2_dq_msg)
-        
+
+    def publish_abs_error_data(self, desire_abs_pose, feedback_abs_pose):
+        abs_error = desire_abs_pose - feedback_abs_pose
+        for i in range(8):
+            self.abs_error_data_msg.data[i] = abs_error[i]
+        self.abs_error_data_pub.publish(self.abs_error_data_msg)
+
     def setup_ros2(self):
         # init robot1 ros2 for control
         self.robot1_q_msg = JointState()
@@ -92,6 +100,14 @@ class LowROSModule(Node):
             self.high_level_u_topic,
             self.high_level_u_callback,
             0)
+        # abs error data
+        self.abs_error_data_msg = Float64MultiArray()
+        self.abs_error_data_msg.data = [0.0] * 8
+        self.abs_error_data_pub = self.create_publisher(
+            Float64MultiArray,
+            'abs_error_data',
+            1)
+
         
     def high_level_u_callback(self, msg: Float64MultiArray):
         self.high_level_u = list(msg.data)

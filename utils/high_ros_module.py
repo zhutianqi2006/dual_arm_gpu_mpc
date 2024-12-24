@@ -67,7 +67,7 @@ class HighROSModule(Node):
             1)
         # init obstacle ros2 for control
         self.obstacle_msg = Float64MultiArray()
-        self.obstacle_msg.data = [0.0] * 3
+        self.obstacle_msg.data = [0.0] * 30
         self.obstacle_pub = self.create_publisher(
             Float64MultiArray,
             self.obstacle_topic,
@@ -78,8 +78,8 @@ class HighROSModule(Node):
             self.high_level_u_msg.data[i] = mppi_u0[i]
         self.high_level_u_pub.publish(self.high_level_u_msg)
 
-    def write_obstacle(self, obstacle):
-        for i in range(3):
+    def write_obstacle(self, obstacle, obstacle_num:int):
+        for i in range(3*obstacle_num):
             self.obstacle_msg.data[i] = obstacle[i]
         self.obstacle_pub.publish(self.obstacle_msg)
 

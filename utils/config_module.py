@@ -39,6 +39,7 @@ class ConfigModule():
         self.batch_size = config_data.get('batch_size', 1000)
         self.mean = config_data.get('mean', 0.0)
         self.std = config_data.get('std', 0.1)
+        self.an_std = config_data.get('an_std', 0.1)
         self.log_std = config_data.get('log_std', 0.2)
         self.max_acc_abs_value = config_data.get('max_acc_abs_value', 0.6)
         self.max_abs_tilt_angle = config_data.get('max_abs_tilt_angle',5)
@@ -56,6 +57,9 @@ class ConfigModule():
         self.terminal_abs_position_weight = config_data.get('terminal_abs_position_weight', 0.1)
         self.q_acc_weight = config_data.get('q_acc_weight', 0.1)
         self.q_vel_weight = config_data.get('q_vel_weight', 0.1)
+        self.stagnation_weight = config_data.get('stagnation_weight', 0.1)
+        self.curobo_world_file = config_data.get('curobo_world_file', 'franka_dynamic_exp3_env.yml')
+        self.curobo_robot_file = config_data.get('curobo_robot_file', 'dual_panda_curobo_obstacle.yml')
         # traditional control
         self.high_rel_gain = config_data.get('high_rel_gain', 0.1)
         self.high_abs_gain = config_data.get('high_abs_gain', 0.1)

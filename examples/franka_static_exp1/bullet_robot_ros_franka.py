@@ -84,13 +84,17 @@ class DualArmBulletModel(Node):
         )
         dual_arm_robot = pyb_utils.Robot(dual_arm_robot_id, client_id=client_id)
         # some cubes for obstacles
-        cube4_id = pyb.loadURDF(
-            "model/plane/plane.urdf", [0.50, 0.02, 100.440], useFixedBase=True, physicsClientId=client_id
+        cube1_id = pyb.loadURDF(
+            "model/plane/big_plane1.urdf", [0.55, 0.00, 0.43], useFixedBase=True, physicsClientId=client_id
+        )
+        cube2_id = pyb.loadURDF(
+            "model/plane/big_plane2.urdf", [0.55, 0.00, 0.50], useFixedBase=True, physicsClientId=client_id
         )
         # store body indices in a dict with more convenient key names
         obstacles = {
             "ground": ground_id,
-            "cube4": cube4_id,
+            "cube1": cube1_id,
+            "cube2": cube2_id,
         }
         pyb.resetDebugVisualizerCamera(
         cameraDistance=1.2,
@@ -99,13 +103,6 @@ class DualArmBulletModel(Node):
         cameraTargetPosition=[0, 0, 0.1]
         )
         return dual_arm_robot, obstacles
-    
-    def update_cube_position(obstacles, client_id, cube_name, new_position, new_orientation=[0, 0, 0, 1]):
-        if cube_name in obstacles:
-            cube_id = obstacles[cube_name]
-            pyb.resetBasePositionAndOrientation(cube_id, new_position, new_orientation, physicsClientId=client_id)
-        else:
-            print(f"Cube {cube_name} 不存在。")
 
     def pyb_update_joint_state(self):
         self.pyb_dual_robot.reset_joint_configuration(self.dual_arm_joint_pos)
@@ -129,8 +126,8 @@ class DualArmBulletModel(Node):
 def main(args=None):
     os.environ['ROS_DOMAIN_ID'] = '16'
     rclpy.init(args=args)
-    franka1_q = np.array([0, -1.0471, 0, -2.6178,  1.5707,  1.5707, 0.7853])
-    franka2_q = np.array([0, -1.0471, 0, -2.6178, -1.5707, 1.5707, 0.7853])
+    franka1_q = np.array([1.2666716500354116, -0.9869800303190713, -1.5651074744022262, -1.4033748241837867,  0.6253245698990879,  1.133453948590221, 0.9050454346760861])
+    franka2_q = np.array([-0.9119943548202025, 0.4042540428908486, -0.13238407256390972, -1.301102234175875, -1.7316200882043775, 2.5964338990501123, 1.0235231385490275])
     dual_arm_model= DualArmBulletModel(franka1_q , franka2_q, 0.008)
     rclpy.spin(dual_arm_model)
     

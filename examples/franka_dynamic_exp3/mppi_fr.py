@@ -72,8 +72,8 @@ def main(args=None):
     os.environ['ROS_DOMAIN_ID'] = '16'
     rclpy.init(args=args)
     # 步骤 3: 实例化DQ_SerialManipulatorDH
-    desire_abs_pose = [0.00085, 0.923642, -0.383209, -0.005971, 0.187191, 0.157905, 0.379813, 0.076992]
-    desire_abs_position = [-0.4, 0.0, 0.825]
+    desire_abs_pose = [0.00085, 0.923642, -0.383209, -0.005971, -0.225078, 0.128528, 0.310921, -0.104754]
+    desire_abs_position = [0.50, 0.02, 0.67]
     desire_rel_pose = [9.63267947e-05,  7.07244290e-01, -7.06969239e-01, -3.67320509e-06, 3.03159877e-01,  1.23636280e-01,  1.23726146e-01, -8.79988859e-02]
     desire_line_d = [0,0,0,1]
     desire_quat_line_ref = [0, -0.011682, 0.003006, -0.999927]

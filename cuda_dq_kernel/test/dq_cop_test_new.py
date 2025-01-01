@@ -1,67 +1,99 @@
 import torch
-from dq_torch import normalize, norm
-from torch.autograd import profiler
-from dq_mult_extension import rel_abs_pose_rel_jac
-import time
+from dq_torch import  norm, rel_abs_pose_rel_jac
+import numpy as np
 import cProfile
-    
-# 步骤 2: 创建DH参数矩阵
-# 假设有一个2关节机械臂，每个关节都是旋转关节
-# 参数顺序：θ（半角），d，a，α（半角），关节类型（0=旋转，1=移动）
-start_time = time.time()
-batch_size = 20000
+from dqrobotics.robot_modeling import DQ_SerialManipulatorMDH, DQ_CooperativeDualTaskSpace
+import time
+########################################################### 
+################### CPU MODEL Define #####################
+##########################################################    
+# cpu robot1
+robot1_config_dh_mat = np.array([[0.0, 0.333,   0.0,        0.0, 0],
+                                [0.0, 0.0,     0.0,    -1.5708, 0],
+                                [0.0, 0.316,   0.0,     1.5708, 0],
+                                [0.0, 0.0,     0.0825,  1.5708, 0],
+                                [0.0, 0.384,  -0.0825, -1.5708, 0],
+                                [0.0, 0.0,     0.0,     1.5708, 0],
+                                [0.0, 0.0,   0.088,   1.5708, 0]])
+robot1_dh_mat =  robot1_config_dh_mat.T
+cpu_robot1 = DQ_SerialManipulatorMDH(robot1_dh_mat)
+# cpu robot2
+robot2_config_dh_mat = np.array([[0.0, 0.333,   0.0,        0.0, 0],
+                                [0.0, 0.0,     0.0,    -1.5708, 0],
+                                [0.0, 0.316,   0.0,     1.5708, 0],
+                                [0.0, 0.0,     0.0825,  1.5708, 0],
+                                [0.0, 0.384,  -0.0825, -1.5708, 0],
+                                [0.0, 0.0,     0.0,     1.5708, 0],
+                                [0.0, 0.0,   0.088,   1.5708, 0]])
+robot2_dh_mat =  robot2_config_dh_mat.T
+cpu_robot2 = DQ_SerialManipulatorMDH(robot2_dh_mat)
+cpu_dq_dual_arm_model = DQ_CooperativeDualTaskSpace(cpu_robot1, cpu_robot2)
+########################################################### 
+################### GPU MODEL Define #####################
+##########################################################    
+batch_size = 2000
 dh_matrix1 = torch.tensor([
-    [0.5, 0.0, 0.1, 0.0, 0],  
-    [0.5, 0.0, 0.1, 0.0, 0],
-    [0.5, 0.0, 0.1, 0.0, 0],
-    [0.5, 0.0, 0.1, 0.0, 0],
-    [0.5, 0.0, 0.1, 0.0, 0],
-    [0.5, 0.0, 0.1, 0.0, 0] 
-], dtype=torch.float32, device= "cuda:0") # .t() 转置矩阵，以匹配类的期望格式
+    [0.0, 0.333,   0.0,        0.0, 0],
+    [0.0, 0.0,     0.0,    -1.5708, 0],
+    [0.0, 0.316,   0.0,     1.5708, 0],
+    [0.0, 0.0,     0.0825,  1.5708, 0],
+    [0.0, 0.384,  -0.0825, -1.5708, 0],
+    [0.0, 0.0,     0.0,     1.5708, 0],
+    [0.0, 0.0,   0.088,   1.5708, 0]
+], dtype=torch.float32, device= "cuda:0")
 dh_matrix2 = torch.tensor([
-    [0.5, 0.0, 0.1, 0.0, 0],  
-    [0.5, 0.0, 0.1, 0.0, 0],
-    [0.5, 0.0, 0.1, 0.0, 0],
-    [0.5, 0.0, 0.1, 0.0, 0],
-    [0.5, 0.0, 0.1, 0.0, 0],
-    [0.5, 0.0, 0.1, 0.0, 0] 
-], dtype=torch.float32, device= "cuda:0")  # .t() 转置矩阵，以匹配类的期望格式
-# 步骤 3: 实例化DQ_SerialManipulatorDH
-base1 = torch.tensor([1, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
-base2 = torch.tensor([1, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
-effector1 = torch.tensor([1, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
-effector2 = torch.tensor([1, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
-q_vec1 = torch.tensor([0.5, 0.5, 0.5 ,0.5, 0.5, 0.5], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1) 
-q_vec2 = torch.tensor([0.5, 0.5, 0.5 ,0.5, 0.5, 0.5], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
+    [0.0, 0.333,   0.0,        0.0, 0],
+    [0.0, 0.0,     0.0,    -1.5708, 0],
+    [0.0, 0.316,   0.0,     1.5708, 0],
+    [0.0, 0.0,     0.0825,  1.5708, 0],
+    [0.0, 0.384,  -0.0825, -1.5708, 0],
+    [0.0, 0.0,     0.0,     1.5708, 0],
+    [0.0, 0.0,   0.088,   1.5708, 0]
+], dtype=torch.float32, device= "cuda:0") 
+dual_arm_joint_pos = [0.5, 0.5, 0.5 ,0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 ,0.5, 0.5, 0.5, 0.5]
+batch_robot1_base = torch.tensor([1, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
+batch_robot2_base = torch.tensor([1, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
+batch_robot1_effector = torch.tensor([1, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
+batch_robot2_effector = torch.tensor([1, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
+q_vec1 = torch.tensor([0.5, 0.5, 0.5 ,0.5, 0.5, 0.5, 0.5], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1) 
+q_vec2 = torch.tensor([0.5, 0.5, 0.5 ,0.5, 0.5, 0.5, 0.5], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
 dh_matrix1 = dh_matrix1.reshape(-1)
 dh_matrix2 = dh_matrix2.reshape(-1)
-end_time = time.time()
-# a,b,c = rel_abs_pose_rel_jac(dh_matrix1, dh_matrix2, base1, base2, effector1, effector2, q_vec1, q_vec2, 5) 
-# a,b,c = rel_abs_pose_rel_jac(dh_matrix1, dh_matrix2, base1, base2, effector1, effector2, q_vec1, q_vec2, 5) 
-print("Time taken: ", end_time - start_time)
+desire_line_d = [0,0,0,1]
+desire_quat_line_ref = [0, -0.011682, 0.003006, -0.999927]
+batch_line_d = torch.tensor(desire_line_d, dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
+batch_quat_line_ref = torch.tensor(desire_quat_line_ref, dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
+########################################################### 
+######################  WARM UP ###########################
+###########################################################   
+for i in range(10):
+    rel_abs_pose_rel_jac(dh_matrix1, dh_matrix2,
+                         batch_robot1_base,  batch_robot2_base, 
+                         batch_robot1_effector, batch_robot2_effector, 
+                         q_vec1, q_vec2,
+                         batch_line_d, batch_quat_line_ref, 7, 7, 1, 1)
 
-q_vec1 = torch.tensor([0.5, 0.5, 0.5 ,0.5, 0.5, 0.5], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1) 
-q_vec2 = torch.tensor([0.5, 0.5, 0.5 ,0.5, 0.5, 0.5], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
+for i in range(10):
+    cpu_dq_dual_arm_model.relative_pose(dual_arm_joint_pos)
+    cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos)
+    cpu_dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
 
-# a,b,c = rel_abs_pose_rel_jac(dh_matrix1, dh_matrix2, base1, base2, effector1, effector2, q_vec1, q_vec2, batch_size, 5)
-a,b,c = rel_abs_pose_rel_jac(dh_matrix1.contiguous(), dh_matrix2.contiguous(), base1, base2, effector1, effector2, q_vec1, q_vec2, 5) 
-a,b,c = rel_abs_pose_rel_jac(dh_matrix1.contiguous(), dh_matrix2.contiguous(), base1, base2, effector1, effector2, q_vec1, q_vec2, 5)
-eps_batch = 1e-8*torch.eye(8, device=base1.device, dtype=base1.dtype).repeat(batch_size, 1, 1)
-new_c = torch.inverse(c@c.permute(0, 2, 1)+eps_batch)
-new_c = torch.inverse(c@c.permute(0, 2, 1)+eps_batch)
+########################################################### 
+###################### START Test #########################
+########################################################### 
 start_time = time.time()
 for i in range(10):
-    a,b,c = rel_abs_pose_rel_jac(dh_matrix1.contiguous(), dh_matrix2.contiguous(), base1, base2, effector1, effector2, q_vec1, q_vec2, 5)
+    rel_abs_pose_rel_jac(dh_matrix1, dh_matrix2,
+                         batch_robot1_base,  batch_robot2_base, 
+                         batch_robot1_effector, batch_robot2_effector, 
+                         q_vec1, q_vec2,
+                         batch_line_d, batch_quat_line_ref, 7, 7, 1, 1)
 end_time = time.time()
 print("Time taken: ", end_time - start_time)
-# print(c)
-# print(c)
-# print(a)
-# print(rel_result1)
-# print(b)
-# print(rel_result2)
-# print(c)
-# print("Time taken: ", end_time - start_time)
-# # # 步骤 6: 打印结果
-# print("Forward Kinematics Result1:", a)
-# # 步骤 6: 打印结果
+start_time = time.time()
+for i in range(20000):
+    cpu_dq_dual_arm_model.relative_pose(dual_arm_joint_pos)
+    cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos)
+    cpu_dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
+end_time = time.time()
+print("Time taken: ", end_time - start_time)

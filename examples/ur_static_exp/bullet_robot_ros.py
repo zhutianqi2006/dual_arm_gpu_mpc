@@ -100,10 +100,26 @@ class DualArmBulletModel(Node):
             "cube3": cube3_id,
             "cube4": cube4_id,
         }
+        pyb.resetDebugVisualizerCamera(
+        cameraDistance=1.0,
+        cameraYaw=51,
+        cameraPitch=-32,
+        cameraTargetPosition=[-0.0, 0.0, 0.0]
+        )
+
         return dual_arm_robot, obstacles
     
     def pyb_update_joint_state(self):
         self.pyb_dual_robot.reset_joint_configuration(self.dual_arm_joint_pos)
+        # camera_info = pyb.getDebugVisualizerCamera(physicsClientId=0)
+        # camera_distance = camera_info[10]
+        # camera_yaw = camera_info[8]
+        # camera_pitch = camera_info[9]
+        # camera_target_position = camera_info[11]
+        # print("Camera Distance:", camera_distance)
+        # print("Camera Yaw:", camera_yaw)
+        # print("Camera Pitch:", camera_pitch)
+        # print("Camera Target Position:", camera_target_position)
         
     def joint_pos_pub(self):
         self.ur3_current_joint_pos += self.dt*self.ur3_current_joint_vel

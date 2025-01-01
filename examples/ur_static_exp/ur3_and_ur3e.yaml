@@ -41,7 +41,7 @@ mppi_seed: 0
 batch_size: 1000
 mean: 0.0
 std: 3.0
-an_std: 0.6
+an_std: 1.0
 log_std: 0.0
 max_acc_abs_value: 3.0
 min_collision_distance: 0.00
@@ -55,11 +55,11 @@ tilt_constraint_weight: 1500.0
 # Mild penalty weights
 abs_weight: 0.0
 abs_position_weight: 0.0
-q_acc_weight: 0.0
-q_vel_weight: 0.0
-stagnation_weight: 0.5
+q_acc_weight: 0.00
+q_vel_weight: 0.00
+stagnation_weight: 0.6
 terminal_abs_weight: 100.0
-terminal_abs_position_weight: 10.0
+terminal_abs_position_weight: 15.0
 # high-level tradtition control parameters
 high_rel_gain: 1.0
 high_abs_gain: 2.0

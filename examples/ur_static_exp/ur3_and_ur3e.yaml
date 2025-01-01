@@ -32,7 +32,7 @@ robot2_dh_parameters:
 robot2_base: [-0.612384, 0.353533, -0.353533, -0.612384, 0.087864, 0.013983, 0.013983, -0.087864]
 robot2_effector: [1, 0, 0, 0, 0, 0, 0, 0]
 high_level_u_topic: '/high_level_u'
-curobo_world_file: 'dual_arm_collision_env.yml'
+curobo_world_file: 'ur_p2p_exp1_env.yml'
 curobo_robot_file: 'dual_arm_model_real.yml'
 # MPPI parameters
 mppi_dt: 0.15
@@ -41,25 +41,25 @@ mppi_seed: 0
 batch_size: 1000
 mean: 0.0
 std: 3.0
-an_std: 1.0
+an_std: 0.3
 log_std: 0.0
 max_acc_abs_value: 3.0
 min_collision_distance: 0.00
 min_self_collision_distance: 0.0
 max_abs_tilt_angle: 8.0 
 # Strict penalty weights
-collision_constraint_weight: 1500.0
+collision_constraint_weight: 1000.0
 q_limit_constraint_weight: 0
 q_vel_constraint_weight: 0
-tilt_constraint_weight: 1500.0
+tilt_constraint_weight: 1000.0
 # Mild penalty weights
 abs_weight: 0.0
 abs_position_weight: 0.0
-q_acc_weight: 0.00
-q_vel_weight: 0.00
-stagnation_weight: 0.6
+q_acc_weight: 0.0
+q_vel_weight: 0.0
+stagnation_weight: 10.0
 terminal_abs_weight: 100.0
-terminal_abs_position_weight: 15.0
+terminal_abs_position_weight: 10.0
 # high-level tradtition control parameters
 high_rel_gain: 1.0
 high_abs_gain: 2.0

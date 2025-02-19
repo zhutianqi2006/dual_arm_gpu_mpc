@@ -39,6 +39,7 @@ class ConfigModule():
         self.batch_size = config_data.get('batch_size', 1000)
         self.mean = config_data.get('mean', 0.0)
         self.std = config_data.get('std', 0.1)
+        self.gamma = config_data.get('gamma',0.1)
         self.an_std = config_data.get('an_std', 0.1)
         self.log_std = config_data.get('log_std', 0.2)
         self.max_acc_abs_value = config_data.get('max_acc_abs_value', 0.6)

@@ -341,21 +341,26 @@ __device__ __forceinline__ void dq_normalize_inline(const scalar_t* v, scalar_t*
 }
 
 template <typename scalar_t>
-__device__ __forceinline__ void hamiplus4_inline(const scalar_t* v, scalar_t** result) 
+__device__ __forceinline__ void hamiplus4_inline(const scalar_t* v, scalar_t* result) 
 {
-    result[0][0] =  v[0]; result[0][1] = -v[1]; result[0][2] = -v[2]; result[0][3] = -v[3];
-    result[1][0] =  v[1]; result[1][1] =  v[0]; result[1][2] = -v[3]; result[1][3] =  v[2];
-    result[2][0] =  v[2]; result[2][1] =  v[3]; result[2][2] =  v[0]; result[2][3] = -v[1];
-    result[3][0] =  v[3]; result[3][1] = -v[2]; result[3][2] =  v[1]; result[3][3] =  v[0];
+    result[0]  =  v[0]; result[1]  = -v[1]; result[2]  = -v[2]; result[3]  = -v[3];
+    result[4]  =  v[1]; result[5]  =  v[0]; result[6]  = -v[3]; result[7]  =  v[2];
+    result[8]  =  v[2]; result[9]  =  v[3]; result[10] =  v[0]; result[11] = -v[1];
+    result[12] =  v[3]; result[13] = -v[2]; result[14] =  v[1]; result[15] =  v[0];
+
 }
 
 template <typename scalar_t>
-__device__ __forceinline__ void haminus4_inline(const scalar_t* v, scalar_t** result)
+__device__ __forceinline__ void haminus4_inline(const scalar_t* v, scalar_t* result)
 { 
-    result[0][0] = v[0]; result[0][1] = -v[1]; result[0][2] = -v[2]; result[0][3] = -v[3];
-    result[1][0] = v[1]; result[1][1] =  v[0]; result[1][2] =  v[3]; result[1][3] = -v[2];
-    result[2][0] = v[2]; result[2][1] = -v[3]; result[2][2] =  v[0]; result[2][3] =  v[1];
-    result[3][0] = v[3]; result[3][1] =  v[2]; result[3][2] = -v[1]; result[3][3] =  v[0];
+    // result[0][0] = v[0]; result[0][1] = -v[1]; result[0][2] = -v[2]; result[0][3] = -v[3];
+    // result[1][0] = v[1]; result[1][1] =  v[0]; result[1][2] =  v[3]; result[1][3] = -v[2];
+    // result[2][0] = v[2]; result[2][1] = -v[3]; result[2][2] =  v[0]; result[2][3] =  v[1];
+    // result[3][0] = v[3]; result[3][1] =  v[2]; result[3][2] = -v[1]; result[3][3] =  v[0];
+    result[0]  =  v[0]; result[1]  = -v[1]; result[2]  = -v[2]; result[3]  = -v[3];
+    result[4]  =  v[1]; result[5]  =  v[0]; result[6]  =  v[3]; result[7]  = -v[2];
+    result[8]  =  v[2]; result[9]  = -v[3]; result[10] =  v[0]; result[11] =  v[1];
+    result[12] =  v[3]; result[13] =  v[2]; result[14] = -v[1]; result[15] =  v[0];
 }
 
 template <typename scalar_t>
@@ -547,6 +552,7 @@ __device__ __forceinline__ void get_w_inline(const scalar_t* dh, const int ith, 
         w[7] = 0;
     }
 } 
+
 #define MAX_ITH 20  // Define an appropriate maximum value
 
 template <typename scalar_t>
@@ -565,7 +571,7 @@ __device__ __forceinline__ void rel_abs_pose_rel_jac_inline(const scalar_t* dh1,
         // Handle error (e.g., return or set default values)
         return;
     }
-
+    // temp for relative pose
     scalar_t x_effector1[8], x_effector2[8], x1[8], x2[8];
     scalar_t j1[8] = {0.0};
     scalar_t j2[8] = {0.0};
@@ -702,6 +708,289 @@ __device__ __forceinline__ void rel_abs_pose_rel_jac_inline(const scalar_t* dh1,
     q_mult_inline(l_d_temp, abs_q_conj, l_c);
     q_angle_inline(l_c, quat_line_ref, angle);
     dq_position_inline(abs_pose, abs_position);
+}
+
+template <typename scalar_t>
+__device__ __forceinline__ void rel_abs_pose_rel_abs_jac_inline(const scalar_t* dh1, const scalar_t* dh2,
+                                                     const scalar_t* base1, const scalar_t* base2,
+                                                     const scalar_t* effector1, const scalar_t* effector2,
+                                                     const scalar_t* theta1,  const scalar_t* theta2,
+                                                     const scalar_t* line_d, const scalar_t* quat_line_ref,
+                                                     const int ith1, const int ith2,
+                                                     scalar_t* rel_pose,  scalar_t* abs_pose, scalar_t** Jxr, scalar_t** Jxa,
+                                                     scalar_t* abs_position, scalar_t* angle, 
+                                                     const int dh1_type, const int dh2_type)
+{
+    // Ensure ith1 and ith2 do not exceed MAX_ITH
+    if (ith1 > MAX_ITH || ith2 > MAX_ITH) {
+        // Handle error (e.g., return or set default values)
+        return;
+    }
+
+    scalar_t x_effector1[8], x_effector2[8], x1[8], x2[8];
+    scalar_t j1[8] = {0.0};
+    scalar_t j2[8] = {0.0};
+    scalar_t z1[8] = {0.0};
+    scalar_t z2[8] = {0.0};
+    scalar_t a1[8] = {0.0};
+    scalar_t a2[8] = {0.0};
+    scalar_t A1[8 * MAX_ITH], A2[8 * MAX_ITH];
+    scalar_t J1[8 * MAX_ITH], J2[8 * MAX_ITH];
+    scalar_t w[8] = {0, 0, 0, 1, 0, 0, 0, 0};
+    scalar_t base1_hp8[64], base2_hp8[64], base1_hm8[64], base2_hm8[64];
+    scalar_t effector1_hm8[64], effector2_hm8[64];
+    scalar_t J1_temp1[64], J2_temp1[64];
+    scalar_t J1_temp2[8 * MAX_ITH], J2_temp2[8 * MAX_ITH];
+    scalar_t x_effector1_sqrt[8] = {0.0};
+    scalar_t x_effector2_conj[8] = {0.0};
+    scalar_t C8[64];
+    scalar_t C4[16];
+    scalar_t hp8_x_effector2_conj[64], hm8_x_effector1[64];
+    scalar_t Jxr1_temp[8 * MAX_ITH], Jxr2_temp[8 * MAX_ITH], Jxr2_C8[64];
+    scalar_t l_d_temp[4] = {0.0};
+    scalar_t l_c[4] = {0.0};
+    scalar_t abs_q[4] = {0.0};
+    scalar_t abs_q_conj[4] = {0.0};
+
+    // temp for absolute jacobian
+    // init C8 and C4
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++){
+                C8[j + i*8] = 0;  // Initialize all elements to 0
+        }
+    }
+    C8[0] =  1;
+    C8[9] = -1;
+    C8[18] = -1;
+    C8[27] = -1;
+    C8[36] =  1;
+    C8[45] = -1;
+    C8[54] = -1;
+    C8[63] = -1;
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++){
+                C4[j + i*4] = 0;  // Initialize all elements to 0
+        }
+    }
+    C4[0] =  1;
+    C4[5] = -1;
+    C4[10] = -1;
+    C4[15] = -1;
+    // init x_effector1, x_effector2, x1, x2
+    for (int i = 0; i < 8; i++) {
+        x_effector1[i] = (i == 0) ? 1 : 0;
+        x_effector2[i] = (i == 0) ? 1 : 0;
+        x1[i] = (i == 0) ? 1 : 0;
+        x2[i] = (i == 0) ? 1 : 0;
+    }
+
+    // get robot1 effector
+    for(int i = 0; i < ith1; i++)
+    {
+        if (dh1_type == 1) { // Assuming mode 1 indicates 'mdh'
+            mdh2dq_inline(dh1, theta1, i, a1); // Use mdh function
+        } else {
+            dh2dq_inline(dh1, theta1, i, a1); // Use standard DH function
+        }
+        dq_mult_inline(x_effector1, a1, x_effector1);
+        for (int j = 0; j < 8; j++) {
+            A1[j + i * 8] = a1[j];
+        }
+    }
+
+    // get robot2 effector
+    for(int i = 0; i < ith2; i++)
+    {
+        if (dh2_type == 1) { // Assuming mode 1 indicates 'mdh'
+            mdh2dq_inline(dh2, theta2, i, a2); // Use mdh function
+        } else {
+            dh2dq_inline(dh2, theta2, i, a2); // Use standard DH function
+        }
+        dq_mult_inline(x_effector2, a2, x_effector2);
+        for (int j = 0; j < 8; j++) {
+            A2[j + i * 8] = a2[j];
+        }
+    }
+
+    for(int i = 0; i < ith1; i++) {
+        get_w_inline(dh1, i, dh1_type, w);
+        Ad_inline(x1, w, z1);
+        for (int j = 0; j < 8; j++) {
+            z1[j] *= 0.5;
+        }
+        dq_mult_inline(x1, &A1[i * 8], x1);
+        dq_mult_inline(z1, x_effector1, j1);
+        
+        for (int j = 0; j < 8; j++) {
+            J1[j * ith1 + i] = j1[j];
+        }
+    }
+    
+    for (int i = 0; i < ith2; i++) {
+        get_w_inline(dh2, i, dh2_type, w);
+        Ad_inline(x2, w, z2);
+        for (int j = 0; j < 8; j++) {
+            z2[j] *= 0.5;
+        }
+        dq_mult_inline(x2, &A2[i * 8], x2);
+        dq_mult_inline(z2, x_effector2, j2);
+        for (int j = 0; j < 8; j++) {
+            J2[j * ith2 + i] = j2[j];
+        }
+    }
+
+    hamiplus8_inline(base1, base1_hp8);
+    hamiplus8_inline(base2, base2_hp8);
+    haminus8_inline(effector1, effector1_hm8);
+    haminus8_inline(effector2, effector2_hm8);
+    mat_mul88_inline(base1_hp8, effector1_hm8, J1_temp1);
+    mat_mul88_inline(base2_hp8, effector2_hm8, J2_temp1);
+    mat_mul_inline(J1_temp1, J1, J1_temp2, 8, 8, ith1);
+    mat_mul_inline(J2_temp1, J2, J2_temp2, 8, 8, ith2);
+    dq_mult_inline(base1, x_effector1, x_effector1);
+    dq_mult_inline(base2, x_effector2, x_effector2);
+    dq_mult_inline(x_effector1, effector1, x_effector1);
+    dq_mult_inline(x_effector2, effector2, x_effector2);
+    conj_inline(x_effector2, x_effector2_conj);
+    
+    dq_mult_inline(x_effector2_conj, x_effector1, rel_pose);
+    dq_sqrt_inline(rel_pose, x_effector1_sqrt);
+    dq_mult_inline(x_effector2, x_effector1_sqrt, abs_pose);
+    hamiplus8_inline(x_effector2_conj, hp8_x_effector2_conj);
+    haminus8_inline(x_effector1, hm8_x_effector1);
+    mat_mul_inline(hp8_x_effector2_conj, J1_temp2, Jxr1_temp, 8, 8, ith1);
+    mat_mul88_inline(hm8_x_effector1, C8, Jxr2_C8);
+    mat_mul_inline(Jxr2_C8, J2_temp2, Jxr2_temp, 8, 8, ith2);
+    for(int i = 0; i < 8; i++){
+        for(int j = 0; j < (ith1 + ith2); j++)
+        {
+            if(j < ith1)
+            {Jxr[i][j] = Jxr1_temp[j + ith1 * i];}
+            else
+            {Jxr[i][j] = Jxr2_temp[j - ith1 + ith2 * i];}
+        }
+    }
+    qconj_inline(abs_pose, abs_q_conj);
+    q_mult_inline(abs_pose, line_d, l_d_temp);
+    q_mult_inline(l_d_temp, abs_q_conj, l_c);
+    q_angle_inline(l_c, quat_line_ref, angle);
+    dq_position_inline(abs_pose, abs_position);
+
+    // temp for rotation_jacobian
+    scalar_t Jxr_temp[8 * 2* MAX_ITH] = {0.0};
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < (ith1 + ith2); j++){
+            Jxr_temp[j + i*(ith1+ith2)] = Jxr[i][j];  // Initialize all elements to 0
+        }
+    }
+    scalar_t Jxr_rotation[8 * MAX_ITH]= {0.0};
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < (ith1+ith2); j++){
+            Jxr_rotation[j + i*(ith1+ith2)] = Jxr_temp[j + i*(ith1+ith2)];  // Initialize all elements to 0
+        }
+    }
+    // temp1 for translation_jacobian
+    scalar_t xr[8]= {0.0};
+    for (int i = 0; i < 8; i++) {
+        xr[i] = rel_pose[i];
+    }
+    scalar_t xr_p[8]= {0.0} ;
+    scalar_t xr_p_conj[8]= {0.0};
+    scalar_t xr_p_conj_hm4[16]= {0.0};
+    scalar_t Jxr_block[8 * MAX_ITH]= {0.0};
+    scalar_t trans_temp1[8 * MAX_ITH]= {0.0};
+    // temp2 for translation_jacobian
+    scalar_t xr_d[8]= {0.0};
+    scalar_t xr_d_hp4[16]= {0.0};
+    scalar_t trans_temp2_C4[16]= {0.0};
+    scalar_t trans_temp2[8 * MAX_ITH]= {0.0};
+    scalar_t Jxr_trans[8 * MAX_ITH]= {0.0};
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < (ith1 + ith2); j++) {
+        Jxr_block[i * (ith1 + ith2) + j] = Jxr_temp[(i + 4) * (ith1 + ith2) + j];
+    }
+    }
+    // calculate for jxr_trans
+    P_inline(xr,xr_p);
+    conj_inline(xr_p, xr_p_conj);
+    haminus4_inline(xr_p_conj, xr_p_conj_hm4);
+    mat_mul_inline(xr_p_conj_hm4, Jxr_block, trans_temp1, 4, 4, (ith1 + ith2));
+    D_inline(xr, xr_d);
+    hamiplus4_inline(xr_d, xr_d_hp4);
+    mat_mul_inline(xr_d_hp4, C4, trans_temp2_C4, 4, 4, 4);
+    mat_mul_inline(trans_temp2_C4, Jxr_rotation, trans_temp2, 4, 4, (ith1 + ith2));
+     for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < (ith1 + ith2); j++) {
+        Jxr_trans[i * (ith1 + ith2) + j] = 2.0*(trans_temp1[i * (ith1 + ith2) + j] + trans_temp2[i * (ith1 + ith2) + j]);
+    }
+    }
+    // calculate for Jrr2
+    scalar_t Jrr2[8*MAX_ITH]= {0.0};
+    scalar_t xr_p_pow[8]= {0.0};
+    scalar_t Jrr2_temp1[8]= {0.0};
+    scalar_t Jrr2_temp2[8]= {0.0};
+    scalar_t Jrr2_temp1_hm4[16]= {0.0};
+    //conj(xr.P())*pow(xr.P(),0.5)
+    dq_sqrt_inline(xr_p, xr_p_pow);
+    dq_mult_inline(xr_p_conj, xr_p_pow, Jrr2_temp1);
+    haminus4_inline(Jrr2_temp1, Jrr2_temp1_hm4);
+    mat_mul_inline(Jrr2_temp1_hm4, Jxr_rotation, Jrr2_temp2, 4, 4, (ith1 + ith2));
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < (ith1 + ith2); j++) {
+        Jrr2[i * (ith1 + ith2) + j] = 0.5*Jrr2_temp2[i * (ith1 + ith2) + j];
+    }
+    }
+    // calculate for Jxr2
+    scalar_t Jxr2[8 * 2* MAX_ITH]= {0.0};
+    scalar_t xr_p_pow_hm4[16]= {0.0};
+    scalar_t xr_trans[8]= {0.0};
+    scalar_t xr_trans_hp4[16]= {0.0};
+    scalar_t Jxr2_temp1[8*MAX_ITH]= {0.0};
+    scalar_t Jxr2_temp2[8*MAX_ITH]= {0.0};
+    haminus4_inline(xr_p_pow, xr_p_pow_hm4);
+    mat_mul_inline(xr_p_pow_hm4, Jxr_trans, Jxr2_temp1, 4, 4, ith1 + ith2);
+    translation_inline(xr, xr_trans);
+    hamiplus4_inline(xr_trans, xr_trans_hp4);
+    mat_mul_inline(xr_trans_hp4, Jrr2, Jxr2_temp2, 4, 4, ith1 + ith2);
+    for (int i = 0; i < 8; i++) 
+    {
+        if (i < 4) 
+        {
+        for (int j = 0; j < (ith1 + ith2); j++)
+        {
+            Jxr2[i * (ith1 + ith2) + j] = Jrr2[i * (ith1 + ith2) + j];
+        }
+        } 
+        else 
+        {
+        for (int j = 0; j < (ith1 + ith2); j++) {
+            Jxr2[i * (ith1 + ith2) + j] = 0.25*Jxr2_temp1[(i - 4) * (ith1 + ith2) + j] + Jxr2_temp2[(i - 4) * (ith1 + ith2) + j];
+        }
+        }
+    }
+    // calculate for Jxr2 temp1
+    scalar_t Jxa_temp1[8 * 2* MAX_ITH]= {0.0};
+    scalar_t Jxa_temp2[8 * 2* MAX_ITH]= {0.0};
+    scalar_t Jxa_temp3[8 * 2* MAX_ITH]= {0.0};
+    for (int i = 0; i < 8; i++) {
+        for (int j = ith1; j < (ith1+ ith2); j++) {
+            Jxa_temp1[i * (ith1 + ith2) + j] = J2[i * (ith2) + (j-ith1)];
+        }
+    }
+    scalar_t xr_pow[8]= {0.0};
+    scalar_t xr_pow_hm8[64]= {0.0};
+    dq_sqrt_inline(xr, xr_pow);
+    haminus8_inline(xr_pow, xr_pow_hm8);
+    mat_mul_inline(xr_pow_hm8, Jxa_temp1,Jxa_temp2, 8, 8, (ith1 + ith2));
+    scalar_t x2_hp8[64]= {0.0};
+    hamiplus8_inline(x2, x2_hp8);
+    mat_mul_inline(x2_hp8, Jxr2, Jxa_temp3, 8, 8, (ith1 + ith2));
+    for(int i = 0; i < 8; i++){
+        for(int j = 0; j < (ith1 + ith2); j++)
+        {
+            Jxa[i][j] = Jxa_temp2[i * (ith1 + ith2) + j] + Jxa_temp3[i * (ith1 + ith2) + j];
+        }
+    }
 }
 
 //----------------------------- kernel 函数------------------------------------
@@ -866,10 +1155,11 @@ __global__ void rotation_angle_kernel(
     int N) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < N) {
-        angle[idx] = 2 * acosf(v[idx][0]);  // Assuming v[idx][0] is the real part of the quaternion
-    }
+        scalar_t real_part = v[idx][0];
+        real_part = max(min(real_part, scalar_t(1.0)), scalar_t(-1.0));  // Clamp to [-1, 1]
+        angle[idx] = 2 * acos(real_part);
 }
-
+}
 template <typename scalar_t>
 __global__ void norm_kernel(
     const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> v,
@@ -1132,7 +1422,46 @@ __global__ void rel_abs_pose_rel_jac_kernel(
 }
     
     
-    
+template <typename scalar_t>
+__global__ void rel_abs_pose_rel_abs_jac_kernel(
+    const torch::PackedTensorAccessor<scalar_t, 1, torch::RestrictPtrTraits, size_t> dh1,
+    const torch::PackedTensorAccessor<scalar_t, 1, torch::RestrictPtrTraits, size_t> dh2,
+    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> base1,
+    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> base2,
+    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> effector1,
+    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> effector2,
+    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> theta1,
+    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> theta2,
+    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> line_d,
+    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> quat_line_ref,
+    int ith1, int ith2, int N,
+    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> rel_pose,
+    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> abs_pose,
+    torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> Jxr,
+    torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> Jxa,
+    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> abs_position,
+    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> angle,
+    int dh1_type, int dh2_type)
+{
+   int idx = blockIdx.x * blockDim.x + threadIdx.x;
+   if (idx < N) {
+    // 准备Jxr_ptr
+    scalar_t* Jxr_ptr[8];
+    scalar_t* Jxa_ptr[8];
+    for (int i = 0; i < 8; i++) {
+        Jxr_ptr[i] = &Jxr[idx][i][0];
+        Jxa_ptr[i] = &Jxa[idx][i][0];
+    }
+    rel_abs_pose_rel_abs_jac_inline(
+        &dh1[0], &dh2[0],
+        &base1[idx][0], &base2[idx][0],
+        &effector1[idx][0], &effector2[idx][0],
+        &theta1[idx][0], &theta2[idx][0],
+        &line_d[idx][0], &quat_line_ref[idx][0],
+        ith1, ith2,
+        &rel_pose[idx][0], &abs_pose[idx][0], Jxr_ptr, Jxa_ptr, &abs_position[idx][0], &angle[idx][0], dh1_type, dh2_type);
+    }
+}
 
 
 //----------------------------- cuda 函数------------------------------------
@@ -1522,4 +1851,49 @@ int ith1, int ith2, int dh1_type, int dh2_type)
     }));
     cudaDeviceSynchronize();
     return std::make_tuple(rel_results, abs_results, jxr_results, abs_position_results, angle);
+}
+
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> rel_abs_pose_rel_abs_jac_cuda
+(torch::Tensor dh1, torch::Tensor dh2,
+torch::Tensor base1, torch::Tensor base2,
+torch::Tensor effector1, torch::Tensor effector2,
+torch::Tensor theta1, torch::Tensor theta2,
+torch::Tensor line_d, torch::Tensor quat_line_ref,
+int ith1, int ith2, int dh1_type, int dh2_type)
+{
+    const int N = theta1.size(0);
+    torch::Tensor rel_results = torch::zeros({N, 8}, theta1.options());
+    torch::Tensor abs_results = torch::zeros({N, 8}, theta1.options());
+    torch::Tensor jxr_results = torch::zeros({N, 8, (ith1+ith2)}, theta1.options());
+    torch::Tensor jxa_results = torch::zeros({N, 8, (ith1+ith2)}, theta1.options());
+    torch::Tensor abs_position_results = torch::zeros({N, 3}, theta1.options());
+    torch::Tensor angle = torch::zeros({N, 1}, theta1.options());
+    const int threads = 256; // 根据实际情况调整
+    const dim3 blocks((N + threads - 1) / threads);
+    AT_DISPATCH_FLOATING_TYPES(theta1.type(), "rel_abs_pose_rel_abs_jac_kernel", 
+    ([&] {
+          rel_abs_pose_rel_abs_jac_kernel<scalar_t><<<blocks, threads>>>(
+          dh1.packed_accessor<scalar_t, 1, torch::RestrictPtrTraits, size_t>(),
+          dh2.packed_accessor<scalar_t, 1, torch::RestrictPtrTraits, size_t>(),
+          base1.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+          base2.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+          effector1.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+          effector2.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+          theta1.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+          theta2.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(), 
+          line_d.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+          quat_line_ref.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+          ith1, ith2,
+          N,
+          rel_results.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+          abs_results.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+          jxr_results.packed_accessor<scalar_t, 3, torch::RestrictPtrTraits, size_t>(),
+          jxa_results.packed_accessor<scalar_t, 3, torch::RestrictPtrTraits, size_t>(),
+          abs_position_results.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+          angle.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+          dh1_type, dh2_type
+        );
+    }));
+    cudaDeviceSynchronize();
+    return std::make_tuple(rel_results, abs_results, jxr_results, jxa_results, abs_position_results, angle);
 }

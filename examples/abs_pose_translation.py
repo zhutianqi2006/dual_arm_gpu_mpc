@@ -1,0 +1,17 @@
+# curobo for collision detection
+from dqrobotics import i_, j_, k_, E_, DQ, vec8 ,vec4
+desire_abs_pose = DQ([- 0.009809, - 0.700866, - 0.008828, 0.713171, 0.03289, - 0.000662, - 0.283115, - 0.003703])
+desire_abs_pose = DQ([- 0.009809, - 0.700866, - 0.008828, 0.713171, -0.02773, 0.000088, - 0.342689, - 0.004537])
+desire_abs_pose = desire_abs_pose.normalize()
+desire_abs_pose_p = desire_abs_pose.P()
+desire_abs_pose_d = desire_abs_pose.D()
+pos = 2*desire_abs_pose_d*desire_abs_pose_p.inv()
+print("deisre_position:",pos)
+deisre_l = desire_abs_pose_p*DQ([0,0,0,1.0])*desire_abs_pose_p.conj()
+print("deisre_l:",deisre_l)
+desire_abs_position = DQ([0.0, -0.4, 0.0, 0.10, 0.0,  0.0, 0.0, 0.0])
+desire_abs_position = DQ([0.0, 0.45, 0.0, 0.52, 0.0,  0.0, 0.0, 0.0])
+desire_abs_position = DQ([0.0, 0.45, 0.0, 0.10, 0.0,  0.0, 0.0, 0.0])
+desire_abs_rot = desire_abs_pose.P()
+print("desire_abs_prim:", desire_abs_rot)
+print("desire_abs_dual:", 0.5*desire_abs_position*desire_abs_rot)

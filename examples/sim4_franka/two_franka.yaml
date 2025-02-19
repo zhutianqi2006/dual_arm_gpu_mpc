@@ -1,0 +1,90 @@
+ros_node_name: 'my_ros_node'
+ros_update_rate: 125
+
+# robot1 parameters
+robot1_q_num: 7
+robot1_q_name_list: ['joint1', 'joint2', 'joint3','joint4', 'joint5', 'joint6', 'joint7']
+robot1_q_sub_topic: 'franka1_joint_states'
+robot1_dq_pub_topic: 'franka1_joint_command'
+robot1_dh_type: 1 # 0 for standard DH parameters, 1 for modified DH parameters
+# theta d a alpha 0
+robot1_dh_parameters:
+  - [0.0, 0.333,   0.0,        0.0, 0]
+  - [0.0, 0.0,     0.0,    -1.5708, 0]
+  - [0.0, 0.316,   0.0,     1.5708, 0]
+  - [0.0, 0.0,     0.0825,  1.5708, 0]
+  - [0.0, 0.384,  -0.0825, -1.5708, 0]
+  - [0.0, 0.0,     0.0,     1.5708, 0]
+  - [0.0, 0.0,   0.088,   1.5708, 0]
+robot1_base: [1.0, 0, 0, 0, 0.0, 0.0, -0.175, 0.0]
+robot1_effector: [1, 0, 0, 0, 0, 0, 0, 0]
+# robot2 parameters
+robot2_q_num: 7
+robot2_q_name_list:  ['joint1', 'joint2', 'joint3','joint4', 'joint5', 'joint6', 'joint7']
+robot2_q_sub_topic: 'franka2_joint_states'
+robot2_dq_pub_topic: 'franka2_joint_command'
+robot2_dh_type: 1
+robot2_dh_parameters:
+  - [0.0, 0.333,   0.0,        0.0, 0]
+  - [0.0, 0.0,     0.0,    -1.5708, 0]
+  - [0.0, 0.316,   0.0,     1.5708, 0]
+  - [0.0, 0.0,     0.0825,  1.5708, 0]
+  - [0.0, 0.384,  -0.0825, -1.5708, 0]
+  - [0.0, 0.0,     0.0,     1.5708, 0]
+  - [0.0, 0.0,   0.088,   1.5708, 0]
+robot2_base: [1.0, 0, 0, 0, 0.0, 0.0, 0.175, 0.0]
+robot2_effector: [1, 0, 0, 0, 0, 0, 0, 0]
+curobo_world_file: 'franka_dynamic_exp2_env.yml'
+curobo_robot_file: 'dual_panda_curobo_obstacle.yml'
+high_level_u_topic: '/high_level_u'
+# MPPI parameters
+mppi_dt: 0.15
+mppi_T: 15
+mppi_seed: 0
+batch_size: 1000
+mean: 0.0
+std: 3.0
+gamma: 0.2
+an_std: 3.0
+log_std: 0.1
+max_acc_abs_value: 3.0
+min_collision_distance: 0.00
+min_self_collision_distance: 0.00
+max_abs_tilt_angle: 8.0
+# Strict penalty weights
+collision_constraint_weight: 1500.0
+q_limit_constraint_weight: 0
+q_vel_constraint_weight: 0
+tilt_constraint_weight: 1500.0
+# Mild penalty weights
+abs_weight: 0.0
+abs_position_weight: 0.0
+q_acc_weight: 0.00
+q_vel_weight: 0.00
+stagnation_weight: 5.0
+terminal_abs_weight: 100.0
+terminal_abs_position_weight: 0.0
+# high-level tradtition control parameters
+high_rel_gain: 1.0
+high_abs_gain: 2.0
+# tradtition control parameters
+rel_gain: 1.0
+abs_gain: 1.0
+# function c to change conrtoller
+c_abs_max: 0.4
+c_eta: 0.30
+# joint position limits
+robot1_q_min: [-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973]
+robot1_q_max: [2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973]
+robot2_q_min: [-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973]
+robot2_q_max: [2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973]
+# joint velocity limits
+robot1_dq_min: [-0.6, -0.6, -0.6, -0.6, -0.6, -0.6, -0.6]
+robot1_dq_max: [0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6]
+robot2_dq_min: [-0.6, -0.6, -0.6, -0.6, -0.6, -0.6, -0.6]
+robot2_dq_max: [0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6]
+# joint acc limits
+robot1_ddq_min: [-2.0, -2.0, -2.0, -2.0, -2.0, -2.0, -2.0]
+robot1_ddq_max: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+robot2_ddq_min: [-2.0, -2.0, -2.0, -2.0, -2.0, -2.0, -2.0]
+robot2_ddq_max: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]

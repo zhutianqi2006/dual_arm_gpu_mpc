@@ -1,27 +1,9 @@
 import torch
-import dq_mult_extension
 import time
 import dq_torch
 from dqrobotics import DQ
-a = torch.tensor([0.5, 0.5, 0.5, 0.5, 0, 0, 0, 0], dtype=torch.float32, device='cuda:0').repeat(1,1)
+a = torch.tensor([9.63267947e-05,  7.07244290e-01, -7.06969239e-01, -3.67320509e-06, 3.03159877e-01,  1.23636280e-01,  1.23726146e-01, -8.79988859e-02], dtype=torch.float32, device='cuda:0').repeat(2,1)
 from dqrobotics import DQ
-dq_robotics_a = DQ(0.5, 0.5, 0.5, 0.5, 0, 0, 0,0)
+dq_robotics_a = DQ(9.63267947e-05,  7.07244290e-01, -7.06969239e-01, -3.67320509e-06, 3.03159877e-01,  1.23636280e-01,  1.23726146e-01, -8.79988859e-02).normalize()
 print("dq_robotics_a: ", dq_robotics_a.rotation_angle())
 print("torch_a: ", dq_torch.rotation_angle(a))
-print("extension_a: ", dq_mult_extension.rotation_angle(a))
-
-# test cuda dq
-a = torch.tensor([0.5, 0.5, 0.5, 0.5, 0, 0, 0, 0], dtype=torch.float32, device='cuda:0').repeat(1000,1)
-dq_mult_extension.rotation_angle(a)
-dq_mult_extension.rotation_angle(a)
-start = time.time()
-for i in range(1000):
-    dq_mult_extension.rotation_angle(a)
-print(time.time()-start)
-## test dq_torch
-dq_torch.rotation_angle(a)
-dq_torch.rotation_angle(a)
-start = time.time()
-for i in range(1000):
-    dq_torch.rotation_angle(a)
-print(time.time()-start)

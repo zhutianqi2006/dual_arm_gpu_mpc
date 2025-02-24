@@ -23,7 +23,7 @@ def main(args=None):
     os.environ['ROS_DOMAIN_ID'] = '16'
     rclpy.init(args=args)
     # 步骤 3: 实例化DQ_SerialManipulatorDH
-    desire_abs_pose = [- 0.009809, - 0.700866, - 0.008828, 0.713171, -0.02773, 0.000088, - 0.342689, - 0.004537]
+    desire_abs_pose = [- 0.009809, - 0.700866, - 0.008828, 0.713171, 0.03289, - 0.000662, - 0.283115, - 0.003703]
     desire_rel_pose = [0.043815, 0.998793, 0.006783, 0.021159, 0.001626, - 0.002018, 0.28023, 0.00204]
 
     config_path = os.path.join(os.path.dirname(__file__), 'ur3_and_ur3e.yaml')

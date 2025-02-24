@@ -329,8 +329,8 @@ class MPPIAdpAnModule():
     def mppi_worker2(self):
         # init ur3 dual quaternion modelwa
         last_u=(self.current_mppi_result[0]).cpu().numpy()
-        self.robot1_q_temp = self.robot1_q + self.mppi_dt*last_u[:self.robot1_q_num]
-        self.robot2_q_temp = self.robot2_q + self.mppi_dt*last_u[self.robot1_q_num:]
+        # self.robot1_q_temp = self.robot1_q + self.mppi_dt*last_u[:self.robot1_q_num]
+        # self.robot2_q_temp = self.robot2_q + self.mppi_dt*last_u[self.robot1_q_num:]
         self.robot1_q_temp = self.robot1_q
         self.robot2_q_temp = self.robot2_q
         self.batch_fake_robot1_q = torch.tensor(self.robot1_q_temp, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
@@ -390,9 +390,9 @@ class MPPIAdpAnModule():
             acc_cost = get_acc_cost(batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq, batch_last_mppi_result, self.robot1_q_num, self.robot2_q_num, i, self.q_acc_weight)
             collision_cost = self.get_collision_cost(self.collision_constraint_weight)
             self.stage_cost += (abs_cost + vel_cost+ collision_cost + acc_cost + tilt_constraint_cost)
-        joint_change = abs(self.first_batch_fake_robot1_q-self.batch_fake_robot1_q).sum(dim=1, keepdim=True)+abs(self.first_batch_fake_robot2_q-self.batch_fake_robot2_q).sum(dim=1, keepdim=True)
+        joint_change = torch.square(self.first_batch_fake_robot1_q-self.batch_fake_robot1_q).sum(dim=1, keepdim=True)+torch.square(self.first_batch_fake_robot2_q-self.batch_fake_robot2_q).sum(dim=1, keepdim=True)
         abs_terminal_cost = get_abs_cost(self.batch_desire_abs_pose, bacth_abs_pos, self.batch_desire_abs_position, batch_abs_position, self.terminal_abs_weight, self.terminal_abs_position_weight)
-        self.stage_cost += abs_terminal_cost + 1.0*joint_change
+        self.stage_cost += abs_terminal_cost + 0.01*joint_change
         min_energy = self.stage_cost.min()
         epsilon = get_all_dq_seq(robot1_acc_explore_seq, robot2_acc_explore_seq)
         w_epsilon = compute_weights(epsilon, self.stage_cost, self.batch_size, self.param_lambda)

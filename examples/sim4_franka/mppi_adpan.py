@@ -74,8 +74,8 @@ class MPPIAdpAnModuleDynamic(MPPIAdpAnModule):
         self.curobo_fn2.update_world(self.curobo_config.world_model.world_model)
 
     def update_obstacle_velocity_estimate(self):
-        self.current_obstacle_x_velocity = (self.current_obstacle_x - self.last_obstacle_x)/0.25
-        self.current_obstacle_y_velocity = (self.current_obstacle_y - self.last_obstacle_y)/0.25
+        self.current_obstacle_x_velocity = (self.current_obstacle_x - self.last_obstacle_x)/0.1
+        self.current_obstacle_y_velocity = (self.current_obstacle_y - self.last_obstacle_y)/0.1
         
     def play_once(self):
         self.update_curobo_world_model(time.time() - self.start_time)

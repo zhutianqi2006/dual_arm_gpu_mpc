@@ -85,10 +85,10 @@ class DualArmBulletModel(Node):
         dual_arm_robot = pyb_utils.Robot(dual_arm_robot_id, client_id=client_id)
         # some cubes for obstacles
         cube2_id = pyb.loadURDF(
-            "model/plane/thine_plane.urdf", [0.50, 0.02, 0.556], useFixedBase=True, physicsClientId=client_id
+            "model/plane/thine_plane.urdf", [0.50, 0.02, 0.58], useFixedBase=True, physicsClientId=client_id
         )
         cube3_id = pyb.loadURDF(
-            "model/plane/thine_plane.urdf", [0.50, 0.02, 0.806], useFixedBase=True, physicsClientId=client_id
+            "model/plane/thine_plane.urdf", [0.50, 0.02, 0.83], useFixedBase=True, physicsClientId=client_id
         )
         cube4_id = pyb.loadURDF(
             "model/plane/plane.urdf", [0.50, 0.02, 100.440], useFixedBase=True, physicsClientId=client_id

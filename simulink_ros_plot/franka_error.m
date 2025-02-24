@@ -5,7 +5,7 @@ data_columns = 1:8; % 前7列为数据列
 % 查找第一个非零数据行，即前7列至少有一个非零
 first_nonzero_row = find(any(out.start.Data(:, 1) ~= 0, 2), 1, 'first');
 start_time = out.abs_error.Data(first_nonzero_row, time_column); % 获取有效数据开始的时间
-end_time = start_time + 20.0; % 计算结束时间
+end_time = start_time + 30.0; % 计算结束时间
 
 % 找到在有效时间范围内的数据行
 valid_rows = out.abs_error.Data(:, time_column) >= start_time & out.abs_error.Data(:, time_column) <= end_time;

@@ -60,6 +60,16 @@ class LowROSModule(Node):
         for i in range(8):
             self.abs_error_data_msg.data[i] = abs_error[i]
         self.abs_error_data_pub.publish(self.abs_error_data_msg)
+    
+    def publish_deisre_abs_pose(self, desire_abs_pose):
+        for i in range(8):
+            self.desire_abs_pose_msg.data[i] = desire_abs_pose[i]
+        self.desire_abs_pose_pub.publish(self.desire_abs_pose_msg)
+
+    def publish_current_abs_pose(self, current_abs_pose):
+        for i in range(8):
+            self.current_abs_pose_msg.data[i] = current_abs_pose[i]
+        self.current_abs_pose_pub.publish(self.current_abs_pose_msg)
 
     def setup_ros2(self):
         # init robot1 ros2 for control
@@ -106,6 +116,20 @@ class LowROSModule(Node):
         self.abs_error_data_pub = self.create_publisher(
             Float64MultiArray,
             'abs_error_data',
+            1)
+        # desire abs pose
+        self.desire_abs_pose_msg = Float64MultiArray()
+        self.desire_abs_pose_msg.data = [0.0] * 8
+        self.desire_abs_pose_pub = self.create_publisher(
+            Float64MultiArray,
+            'desire_abs_pose',
+            1)
+        # current abs pose
+        self.current_abs_pose_msg = Float64MultiArray()
+        self.current_abs_pose_msg.data = [0.0] * 8
+        self.current_abs_pose_pub = self.create_publisher(
+            Float64MultiArray,
+            'current_abs_pose',
             1)
 
         

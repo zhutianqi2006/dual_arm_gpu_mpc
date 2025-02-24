@@ -272,7 +272,7 @@ class MPPIBiasedExpModule():
                                                      self.batch_fake_robot1_q, self.batch_fake_robot2_q,
                                                      self.batch_line_d, self.batch_quat_line_ref, self.robot1_q_num, self.robot2_q_num, self.robot1_dh_type, self.robot2_dh_type)
                 bacth_rel_jacobian_null =  get_rel_jacobian_null(bacth_rel_jacobian, self.robot1_q_num, self.robot2_q_num, self.batch_size)
-            biased_vel = -0.2*self.mppi_dt*torch.matmul(torch.linalg.pinv(bacth_abs_jacobian),get_abs_error(self.batch_desire_abs_pose, bacth_abs_pos))
+            biased_vel = 0.05*self.mppi_dt*torch.matmul(torch.linalg.pinv(bacth_abs_jacobian),get_abs_error(self.batch_desire_abs_pose, bacth_abs_pos))
             biased_vel = biased_vel.squeeze(-1)
             batch_robot1_ith_dq, batch_robot2_ith_dq = get_current_vel(batch_robot1_dq_seq, batch_robot2_dq_seq, i)
             batch_robot1_ith_dq = batch_robot1_ith_dq + biased_vel[:,:self.robot1_q_num]

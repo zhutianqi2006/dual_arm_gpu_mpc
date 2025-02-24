@@ -72,6 +72,7 @@ class LowLevelModule():
         self.get_u()
         self.send_u()
         self.ros_module.publish_abs_error_data(vec8(self.desire_abs_pose), vec8(self.dual_arm_abs_feedback))
+        self.ros_module.publish_current_abs_pose(vec8(self.dual_arm_abs_feedback))
 
 
     def update_joint_states(self):

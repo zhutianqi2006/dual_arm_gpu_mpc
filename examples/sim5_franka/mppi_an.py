@@ -54,26 +54,19 @@ class MPPIAnModuleDynamic(MPPIAnModule):
         self.curobo_fn2.update_world(self.curobo_config.world_model.world_model)
 
     def update_obstacle_velocity_estimate(self):
-        self.current_obstacle_x_velocity = (self.current_obstacle_x - self.last_obstacle_x)/0.05
+        self.current_obstacle_x_velocity = (self.current_obstacle_x - self.last_obstacle_x)/0.15
         
     def play_once(self):
         self.update_curobo_world_model(time.time() - self.start_time)
         self.update_joint_states()
         self.update_obstacle_velocity_estimate()
         self.update_fake_curobo_world_model(self.current_obstacle_x_velocity)
-        mppi_u0, mppi_energy = self.mppi_worker()
-        p_u0, p_energy = self.traditional_control_result()
+        _, mppi_energy = self.mppi_worker()
+        mppi_u0, _ = self.mppi_worker2()
         print("mppi_energy: ", mppi_energy)
-        print("p_energy: ", p_energy)
-        mppi_u0 = mppi_u0.cpu().numpy()
-        flag = self.update_c(mppi_energy, p_energy)
+        mppi_u0 = mppi_u0[0].cpu().numpy()
         print(self.c)
-        if(flag ==True):
-            u0 = p_u0
-            self.last_mppi_result = torch.zeros(self.mppi_T, (self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
-            self.current_mppi_result = torch.zeros(self.mppi_T, (self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
-        else:
-            u0 =mppi_u0
+        u0 =mppi_u0
         u0 = u0.tolist()
         self.ros_module.write_high_u(u0)
 

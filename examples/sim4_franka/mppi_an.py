@@ -74,17 +74,18 @@ class MPPIAnModuleDynamic(MPPIAnModule):
         self.curobo_fn2.update_world(self.curobo_config.world_model.world_model)
 
     def update_obstacle_velocity_estimate(self):
-        self.current_obstacle_x_velocity = (self.current_obstacle_x - self.last_obstacle_x)/0.05
-        self.current_obstacle_y_velocity = (self.current_obstacle_y - self.last_obstacle_y)/0.05
+        self.current_obstacle_x_velocity = (self.current_obstacle_x - self.last_obstacle_x)/0.1
+        self.current_obstacle_y_velocity = (self.current_obstacle_y - self.last_obstacle_y)/0.1
         
     def play_once(self):
         self.update_curobo_world_model(time.time() - self.start_time)
         self.update_joint_states()
         self.update_obstacle_velocity_estimate()
         self.update_fake_curobo_world_model(self.current_obstacle_x_velocity, self.current_obstacle_y_velocity)
-        mppi_u0, mppi_energy = self.mppi_worker()
+        _, mppi_energy = self.mppi_worker()
+        mppi_u0, _ = self.mppi_worker2()
         print("mppi_energy: ", mppi_energy)
-        mppi_u0 = mppi_u0.cpu().numpy()
+        mppi_u0 = mppi_u0[0].cpu().numpy()
         print(self.c)
         u0 =mppi_u0
         u0 = u0.tolist()

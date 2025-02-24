@@ -36,6 +36,7 @@ class HighROSModule(Node):
         # init high level u
         self.high_level_u_topic = config.high_level_u_topic
         self.obstacle_topic = "moving_obstacle"
+        self.dynamic_obstacle = [1000.0, 0.0, 0.0]
         self.setup_ros2()
 
     def read_joint_state(self):
@@ -72,6 +73,12 @@ class HighROSModule(Node):
             Float64MultiArray,
             self.obstacle_topic,
             1)
+        # init obstacle subscriber
+        self.obstacle_sub = self.create_subscription(
+            Float64MultiArray,
+            "/object_relative_position",
+            self.obstacle_callback,
+            0)
         
     def write_high_u(self, mppi_u0):
         for i in range(self.robot1_q_num+self.robot2_q_num):
@@ -90,7 +97,10 @@ class HighROSModule(Node):
     def robot2_q_callback(self, msg: JointState):
         self.robot2_q = list(msg.position[:self.robot2_q_num])
         self.robot2_init_flag = True
-    
+
+    def obstacle_callback(self, msg: Float64MultiArray):
+        self.dynamic_obstacle = list(msg.data[:3])
+
     def run(self):
         rclpy.spin(self)
         self.destroy_node()

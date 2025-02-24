@@ -31,7 +31,7 @@ cpu_dq_dual_arm_model = DQ_CooperativeDualTaskSpace(cpu_robot1, cpu_robot2)
 ########################################################### 
 ################### GPU MODEL Define #####################
 ##########################################################    
-batch_size = 1
+batch_size = 20000
 dh_matrix1 = torch.tensor([
     [0.0, 0.333,   0.0,        0.0, 0],
     [0.0, 0.0,     0.0,    -1.5708, 0],
@@ -76,36 +76,37 @@ print( cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos))
 ########################################################### 
 ######################  WARM UP ###########################
 ###########################################################   
-# for i in range(10):
-#     rel_abs_pose_rel_abs_jac(dh_matrix1, dh_matrix2,
-#                          batch_robot1_base,  batch_robot2_base, 
-#                          batch_robot1_effector, batch_robot2_effector, 
-#                          q_vec1, q_vec2,
-#                          batch_line_d, batch_quat_line_ref, 7, 7, 1, 1)
+for i in range(10):
+    rel_abs_pose_rel_abs_jac(dh_matrix1, dh_matrix2,
+                         batch_robot1_base,  batch_robot2_base, 
+                         batch_robot1_effector, batch_robot2_effector, 
+                         q_vec1, q_vec2,
+                         batch_line_d, batch_quat_line_ref, 7, 7, 1, 1)
 
-# for i in range(10):
-#     cpu_dq_dual_arm_model.relative_pose(dual_arm_joint_pos)
-#     cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos)
-#     cpu_dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
-#     cpu_dq_dual_arm_model.absolute_pose_jacobian(dual_arm_joint_pos)
+for i in range(10):
+    cpu_dq_dual_arm_model.relative_pose(dual_arm_joint_pos)
+    cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos)
+    cpu_dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
+    cpu_dq_dual_arm_model.absolute_pose_jacobian(dual_arm_joint_pos)
 
-# ########################################################### 
-# ###################### START Test #########################
-# ########################################################### 
-# start_time = time.time()
-# for i in range(10):
-#      rel_abs_pose_rel_abs_jac(dh_matrix1, dh_matrix2,
-#                          batch_robot1_base,  batch_robot2_base, 
-#                          batch_robot1_effector, batch_robot2_effector, 
-#                          q_vec1, q_vec2,
-#                          batch_line_d, batch_quat_line_ref, 7, 7, 1, 1)
-# end_time = time.time()
-# print("Time taken: ", end_time - start_time)
-# start_time = time.time()
-# for i in range(20000):
-#     cpu_dq_dual_arm_model.relative_pose(dual_arm_joint_pos)
-#     cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos)
-#     cpu_dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
-#     cpu_dq_dual_arm_model.absolute_pose_jacobian(dual_arm_joint_pos)
-# end_time = time.time()
-# print("Time taken: ", end_time - start_time)
+########################################################### 
+###################### START Test #########################
+########################################################### 
+for i in range(100):
+    start_time = time.time()
+    rel_abs_pose_rel_abs_jac(dh_matrix1, dh_matrix2,
+                         batch_robot1_base,  batch_robot2_base, 
+                         batch_robot1_effector, batch_robot2_effector, 
+                         q_vec1, q_vec2,
+                         batch_line_d, batch_quat_line_ref, 7, 7, 1, 1)
+    end_time = time.time()
+    print("GPU Time taken: ", end_time - start_time)
+for i in range(100):
+    start_time = time.time()
+    for i in range(20000):
+        cpu_dq_dual_arm_model.relative_pose(dual_arm_joint_pos)
+        cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos)
+        cpu_dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
+        cpu_dq_dual_arm_model.absolute_pose_jacobian(dual_arm_joint_pos)
+    end_time = time.time()
+    print("CPU Time taken: ", end_time - start_time)

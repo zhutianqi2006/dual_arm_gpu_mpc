@@ -41,9 +41,11 @@ mppi_seed: 0
 batch_size: 1000
 mean: 0.0
 std: 3.0
-gamma: 0.01
-an_std: 3.0
+gamma: 2.0
+an_std: 0.6
 log_std: 0.1
+num_clusters: 6
+common_num: 3
 max_acc_abs_value: 3.0
 min_collision_distance: 0.00
 min_self_collision_distance: 0.0

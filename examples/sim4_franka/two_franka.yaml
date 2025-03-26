@@ -47,6 +47,8 @@ std: 3.0
 gamma: 0.2
 an_std: 3.0
 log_std: 0.1
+num_clusters: 3
+common_num: 1
 max_acc_abs_value: 3.0
 min_collision_distance: 0.00
 min_self_collision_distance: 0.00
@@ -65,11 +67,11 @@ stagnation_weight: 5.0
 terminal_abs_weight: 100.0
 terminal_abs_position_weight: 0.0
 # high-level tradtition control parameters
-high_rel_gain: 1.0
-high_abs_gain: 2.0
+high_rel_gain: 0.5
+high_abs_gain: 1.0
 # tradtition control parameters
-rel_gain: 1.0
-abs_gain: 1.0
+rel_gain: 0.5
+abs_gain: 0.5
 # function c to change conrtoller
 c_abs_max: 0.4
 c_eta: 0.30

@@ -85,7 +85,7 @@ class DualArmBulletModel(Node):
         # some cubes for obstacles
         # store body indices in a dict with more convenient key names
         cube2_id = pyb.loadURDF(
-            "model/plane/dynamic.urdf", [0.32, 0.22, 0.38], useFixedBase=True, physicsClientId=client_id
+            "model/plane/dynamic.urdf", [0.42, 0.20, 0.38], useFixedBase=True, physicsClientId=client_id
         )
         # store body indices in a dict with more convenient key names
         obstacles = {

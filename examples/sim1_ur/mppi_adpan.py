@@ -35,6 +35,7 @@ def main(args=None):
     config = ConfigModule(config_path)
     mppi_module = MPPIAdpAnModule(config, desire_abs_pose, desire_abs_position, desire_rel_pose, desire_line_d, desire_quat_line_ref)
     mppi_module.warm_up()
+    mppi_module.warm_up2()
     while True:
         mppi_module.play_once()
 

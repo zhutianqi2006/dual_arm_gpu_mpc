@@ -44,6 +44,8 @@ std: 3.0
 gamma: 0.5
 an_std: 0.6
 log_std: 0.1
+num_clusters: 3
+common_num: 1
 max_acc_abs_value: 3.0
 min_collision_distance: 0.00
 min_self_collision_distance: 0.0

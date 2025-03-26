@@ -22,7 +22,7 @@ from kmeans_pytorch import kmeans
 import rclpy
 import array
 
-class MPPIAdpAnModule():
+class MPPIKmeansAnModule():
     def __init__(self, config: ConfigModule , desire_abs_pose: torch.Tensor, desire_abs_position: torch.Tensor,
                  desire_rel_pose: torch.Tensor, desire_line_d: torch.Tensor,  desire_quat_line_ref: torch.Tensor):
         # torch type
@@ -316,10 +316,31 @@ class MPPIAdpAnModule():
         joint_change = torch.clamp(joint_change, min=min_joint_change)
         stagnation_cost = self.stagnation_weight*joint_change
         abs_terminal_cost = get_abs_cost(self.batch_desire_abs_pose, bacth_abs_pos, self.batch_desire_abs_position, batch_abs_position, self.terminal_abs_weight, self.terminal_abs_position_weight)
+        
         self.stage_cost += abs_terminal_cost + abs_terminal_cost/stagnation_cost
+        num_clusters = 10
+        combined_tensor = torch.cat(((self.first_batch_fake_robot1_q-self.batch_fake_robot1_q)/6.0,(self.first_batch_fake_robot2_q-self.batch_fake_robot2_q)/6.0), dim=1)
         min_energy = self.stage_cost.min()
+        min_index = self.stage_cost.argmin()
+        cluster_ids_x, cluster_centers = kmeans(
+            X=combined_tensor, num_clusters=num_clusters, distance='euclidean', device=torch.device('cuda:0'))
+        stage_cost = self.stage_cost.squeeze()  # 转换为1D张量
+        _, indices = torch.topk(stage_cost, k=10, largest=False)
+        indices = indices.cpu()  
+        # 获取对应的类别
+        selected_clusters = cluster_ids_x[indices]
+        # 统计出现次数
+        counts = torch.bincount(selected_clusters, minlength=num_clusters)
+        most_common_cluster = torch.argmax(counts).item()
         epsilon = get_all_dq_seq(robot1_acc_explore_seq, robot2_acc_explore_seq)
-        w_epsilon = compute_weights(epsilon, self.stage_cost, self.batch_size, self.param_lambda)
+        # combined_tensor = (5*joint_change)
+       
+        min_type = most_common_cluster
+        selected_indices = (cluster_ids_x == min_type).nonzero().squeeze()
+        selected_stage_cost = self.stage_cost[selected_indices]
+        selected_epsilon = epsilon[selected_indices]
+        selected_batch_size = selected_indices.size(0)
+        w_epsilon = compute_weights(selected_epsilon, selected_stage_cost, selected_batch_size, self.param_lambda)
         w_epsilon = self.moving_average_filter(w_epsilon, int(self.mppi_T))
         self.current_mppi_result = w_epsilon + self.last_mppi_result
         self.current_mppi_result = torch.clamp(self.current_mppi_result, torch.cat((self.gpu_robot1_dq_min, self.gpu_robot2_dq_min)), torch.cat((self.gpu_robot1_dq_max, self.gpu_robot2_dq_max)))
@@ -451,6 +472,45 @@ class MPPIAdpAnModule():
         terminal_abs_position_cost = self.terminal_abs_position_weight * np.linalg.norm(desire_abs_position - vec4(abs_position))
         energy += terminal_abs_cost + terminal_abs_position_cost +tilt_cost
         return  dual_arm_return, energy
+
+    def get_cost(self, sequence):
+        dual_arm_joint_pos = np.concatenate((self.robot1_q, self.robot2_q))
+        energy = 0
+        for i in range(self.mppi_T):
+            dual_arm_abs_feedback = vec8(self.cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos))
+            dual_arm_rel_feedback = vec8(self.cpu_dq_dual_arm_model.relative_pose(dual_arm_joint_pos))
+            dual_arm_abs_error = self.cpu_desire_abs_pose - dual_arm_abs_feedback
+            dual_arm_rel_jacobian = self.cpu_dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
+            dual_arm_rel_jacobian_roboust_inv = dual_arm_rel_jacobian.T @ np.linalg.pinv(np.matmul(dual_arm_rel_jacobian, dual_arm_rel_jacobian.T) + 0.0000001 * np.eye(8))
+            # abs control
+            dual_arm_abs_feedback = vec8(self.cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos))
+            dual_arm_abs_refer = vec8(DQ(self.desire_abs_pose).normalize())
+            dual_arm_abs_joint_vel = sequence[i].cpu().numpy()
+            # null space control
+            dual_arm_joint_vel = np.matmul(np.eye(self.robot1_q_num+self.robot2_q_num)-dual_arm_rel_jacobian_roboust_inv@(dual_arm_rel_jacobian), dual_arm_abs_joint_vel)      
+            dual_arm_joint_pos +=  self.mppi_dt * dual_arm_joint_vel
+            dual_arm_abs_feedback = self.cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos)
+            abs_cost = self.abs_weight* np.linalg.norm(dual_arm_abs_refer - vec8(dual_arm_abs_feedback))
+            abs_pose_p = dual_arm_abs_feedback.P()
+            abs_pose_d = dual_arm_abs_feedback.D()
+            abs_position = (2*abs_pose_d*abs_pose_p.conj())
+            current_l_quat = abs_pose_p*self.cpu_desire_line_d*abs_pose_p.conj()
+            angle = 57.2958*math.acos(vec4(current_l_quat).dot(vec4(self.cpu_desire_quat_line_ref)))
+            if abs(angle) > self.max_abs_tilt_angle:
+                tilt_cost = 1*self.tilt_constraint_weight
+            else:
+                tilt_cost = 0
+            desire_abs_position = [0,self.desire_abs_position[0],self.desire_abs_position[1],self.desire_abs_position[2]]
+            abs_position_cost = self.abs_position_weight * np.linalg.norm(desire_abs_position - vec4(abs_position))
+            dual_arm_joint_pos_cuda = torch.from_numpy(dual_arm_joint_pos).view(1, (self.robot1_q_num+self.robot2_q_num)).cuda().float()
+            d_world, d_self = self.curobo_fn2.get_world_self_collision_distance_from_joints(dual_arm_joint_pos_cuda)
+            d_new = d_world + d_self
+            d_new[d_new!=0] = self.collision_constraint_weight
+            energy += abs_cost + abs_position_cost + d_new + tilt_cost
+        terminal_abs_cost = self.terminal_abs_weight * np.linalg.norm(dual_arm_abs_refer - vec8(dual_arm_abs_feedback))
+        terminal_abs_position_cost = self.terminal_abs_position_weight * np.linalg.norm(desire_abs_position - vec4(abs_position))
+        energy += terminal_abs_cost + terminal_abs_position_cost +tilt_cost
+        return  energy
     
     def mppi_result_modefied(self):
         dual_arm_joint_pos = np.concatenate((self.robot1_q, self.robot2_q))
@@ -489,13 +549,14 @@ class MPPIAdpAnModule():
         self.first_element_mppi_result = torch.zeros((self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
         self.c = 0.0
         self.start_time = time.time()
+        
     def warm_up2(self):
         for i in range(10):
             self.update_joint_states()
-            mppi_u0, mppi_energy = self.mppi_worker()
-            _, _ = self.mppi_worker2()
+            _, mppi_energy = self.mppi_worker()
+            mppi_u, _ = self.mppi_worker2()
             p_u0, p_energy = self.traditional_control_result()
-            mppi_u0 = mppi_u0.cpu().numpy()
+            mppi_u0 = mppi_u[0].cpu().numpy()
             flag = self.update_c(mppi_energy, p_energy)
         self.c = 0.0
         self.start_time = time.time()
@@ -505,18 +566,8 @@ class MPPIAdpAnModule():
         self.update_joint_states()
         _, mppi_energy = self.mppi_worker()
         mppi_u, _ = self.mppi_worker2()
-        p_u0, p_energy = self.traditional_control_result()
-        print("mppi_energy: ", mppi_energy)
-        print("p_energy: ", p_energy)
         mppi_u0 = mppi_u[0].cpu().numpy()
-        flag = self.update_c(mppi_energy, p_energy)
-        print(self.c)
-        if(flag ==True):
-            u0 = p_u0
-            self.last_mppi_result = torch.zeros(self.mppi_T, (self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
-            self.current_mppi_result = torch.zeros(self.mppi_T, (self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
-        else:
-            u0 =mppi_u0
+        u0 =mppi_u0
         u0 = u0.tolist()
         self.ros_module.write_high_u(u0)
 
@@ -572,6 +623,7 @@ def compute_weights(epsilon: torch.Tensor, S: torch.Tensor, batch_size:int, p_la
     w = (1.0 / eta) * torch.exp((-1.0 / p_lamada) * (S - rho))
     w_epsilon = torch.sum(w.view(batch_size, 1, 1) * epsilon, dim=0)
     return w_epsilon
+
 
 # return u through null space
 @torch.jit.script

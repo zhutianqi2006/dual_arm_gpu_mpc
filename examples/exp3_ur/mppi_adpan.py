@@ -22,46 +22,6 @@ from utils.mppi_adpan_module import MPPIAdpAnModule
 import rclpy
 import array
 
-class MPPIAdpAnModuleDynamic(MPPIAdpAnModule):
-    
-    def init_collision_model(self):
-        self.tensor_args = TensorDeviceType()
-        self.curobo_config = RobotWorldConfig.load_from_config(self.curobo_robot_file, self.curobo_world_file, 
-                                                               collision_activation_distance=self.min_collision_distance,
-                                                               self_collision_activation_distance=self.min_self_collision_distance)
-        self.curobo_fn = RobotWorld(self.curobo_config)
-        self.curobo_fn2 = RobotWorld(self.curobo_config)
-        self.init_obstacle_x = self.curobo_config.world_model.world_model.cuboid[0].pose[0]
-        self.init_obstacle_x_dim = self.curobo_config.world_model.world_model.cuboid[0].dims[0]
-
-    def update_curobo_world_model(self):
-        self.curobo_config.world_model.world_model.cuboid[0].pose[0] = self.ros_module.dynamic_obstacle[0]
-        self.curobo_config.world_model.world_model.cuboid[0].pose[1] = self.ros_module.dynamic_obstacle[1]
-        self.curobo_config.world_model.world_model.cuboid[0].pose[2] = self.ros_module.dynamic_obstacle[2]
-        self.ros_module.write_obstacle(self.curobo_config.world_model.world_model.cuboid[0].pose[0:3], 1)
-        self.curobo_fn.update_world(self.curobo_config.world_model.world_model)
-        self.curobo_fn2.update_world(self.curobo_config.world_model.world_model)
-
-
-    def play_once(self):
-        self.update_curobo_world_model()
-        self.update_joint_states()
-        _, mppi_energy = self.mppi_worker()
-        mppi_u, _ = self.mppi_worker2()
-        mppi_u0 = mppi_u[0].cpu().numpy()
-        p_u0, p_energy = self.traditional_control_result()
-        print("mppi_energy: ", mppi_energy)
-        print("p_energy: ", p_energy)
-        flag = self.update_c(mppi_energy, p_energy)
-        print(self.c)
-        if(flag ==True):
-            u0 = p_u0
-            self.last_mppi_result = torch.zeros(self.mppi_T, (self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
-            self.current_mppi_result = torch.zeros(self.mppi_T, (self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
-        else:
-            u0 =mppi_u0
-        u0 = u0.tolist()
-        self.ros_module.write_high_u(u0)
 
 def main(args=None):
     os.environ['ROS_DOMAIN_ID'] = '16'
@@ -75,7 +35,7 @@ def main(args=None):
     desire_quat_line_ref = [0,-0.9995,-0.026341,0.017418]
     config_path = os.path.join(os.path.dirname(__file__), 'ur3_and_ur3e.yaml')
     config = ConfigModule(config_path)
-    mppi_module = MPPIAdpAnModuleDynamic(config, desire_abs_pose, desire_abs_position, desire_rel_pose, desire_line_d, desire_quat_line_ref)
+    mppi_module = MPPIAdpAnModule(config, desire_abs_pose, desire_abs_position, desire_rel_pose, desire_line_d, desire_quat_line_ref)
     mppi_module.warm_up()
     while True:
         mppi_module.play_once()

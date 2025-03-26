@@ -1,4 +1,3 @@
-
 # Python standard lib
 import os
 import sys
@@ -26,7 +25,7 @@ class DualArmRealModel(Node):
         super().__init__('dual_arm_model')
         self.dt = dt
         self.gui_id = pyb.connect(pyb.GUI)
-        self.pyb_ur3_robot, self.pyb_ur3e_robot, _ = self.pyb_load_environment(self.gui_id)
+        self.pyb_dual_robot, _ = self.pyb_load_environment(self.gui_id) 
         self.init_rtde() 
         self.setup_ros2()
 
@@ -86,53 +85,43 @@ class DualArmRealModel(Node):
         pyb.setAdditionalSearchPath(pybullet_data.getDataPath(), physicsClientId=client_id)
         # ground plane
         ground_id = pyb.loadURDF("plane.urdf", [0, 0, 0], useFixedBase=True, physicsClientId=client_id)
-        # ur3 robot arm
-        ur3_id = pyb.loadURDF(
-            "model/ur3/ur3.urdf",
+        dual_arm_robot_id = pyb.loadURDF(
+            "model/dual_arm_model/dual_arm_model.urdf",
             [0, 0, 0],
             useFixedBase=True,
-            physicsClientId=client_id,
+            physicsClientId=client_id
         )
-        robot = pyb_utils.Robot(ur3_id, client_id=client_id)
-        # ur3e robot arm
-        ur3e_id = pyb.loadURDF(
-            "model/ur3e/ur3e.urdf",
-            [0, 0, 0],
-            useFixedBase=True,
-            physicsClientId=client_id,
-        )
-        ur3_robot = pyb_utils.Robot(ur3_id, client_id=client_id)
-        ur3e_robot = pyb_utils.Robot(ur3e_id, client_id=client_id)
+        dual_arm_robot = pyb_utils.Robot(dual_arm_robot_id, client_id=client_id)
         # some cubes for obstacles
-        cube1_id = pyb.loadURDF(
-            "model/plane/plane.urdf", [0.56, 0.0, 0.006], useFixedBase=True, physicsClientId=client_id
-        )
+        # store body indices in a dict with more convenient key names
         cube2_id = pyb.loadURDF(
-            "model/plane/plane.urdf", [0.56, 0.0, 0.206], useFixedBase=True, physicsClientId=client_id
-        )
-        cube3_id = pyb.loadURDF(
-            "model/plane/plane.urdf", [0.56, 0.0, 0.406], useFixedBase=True, physicsClientId=client_id
+            "model/plane/dynamic.urdf", [0.32, 0.22, 0.38], useFixedBase=True, physicsClientId=client_id
         )
         # store body indices in a dict with more convenient key names
         obstacles = {
             "ground": ground_id,
-            "cube1": cube1_id,
-            "cube2": cube2_id,
-            "cube3": cube3_id,
+            "cube2": cube2_id
         }
-        return ur3_robot,ur3e_robot, obstacles
+        pyb.resetDebugVisualizerCamera(
+        cameraDistance=1.0,
+        cameraYaw=51,
+        cameraPitch=-32,
+        cameraTargetPosition=[-0.0, 0.0, 0.0]
+        )
+
+        return dual_arm_robot, obstacles
     
     def pyb_update_joint_state(self):
-        self.pyb_ur3_robot.reset_joint_configuration(self.ur3_current_joint_pos)
-        self.pyb_ur3e_robot.reset_joint_configuration(self.ur3e_current_joint_pos)
+        self.pyb_dual_robot.reset_joint_configuration(self.dual_arm_joint_pos)
         
     def joint_pos_pub(self):
-        self.ur3_current_joint_pos = np.array(self.ur3_robot_receive.getActualQ())
-        self.ur3e_current_joint_pos = np.array(self.ur3e_robot_receive.getActualQ())
+        self.ur3_current_joint_pos += self.dt*self.ur3_current_joint_vel
+        self.ur3e_current_joint_pos += self.dt*self.ur3e_current_joint_vel
         self.ur3_pos_msg.position = self.ur3_current_joint_pos.tolist()
         self.ur3e_pos_msg.position = self.ur3e_current_joint_pos.tolist()
         self.publisher_ur3.publish(self.ur3_pos_msg)
         self.publisher_ur3e.publish(self.ur3e_pos_msg)
+        self.dual_arm_joint_pos = np.concatenate((self.ur3_current_joint_pos, self.ur3e_current_joint_pos))
         self.pyb_update_joint_state()
 
 def main(args=None):

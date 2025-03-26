@@ -17,7 +17,7 @@ from dqrobotics.robot_modeling import DQ_SerialManipulatorDH, DQ_SerialManipulat
 from dq_torch import rel_abs_pose_rel_jac
 from utils.config_module import ConfigModule
 from utils.high_ros_module import HighROSModule
-from utils.mppi_adpan_module import MPPIAdpAnModule
+from utils.mppi_kmeans_adpan_module import MPPIKmeansAdpAnModule
 # 
 import rclpy
 import array
@@ -33,9 +33,8 @@ def main(args=None):
     desire_quat_line_ref = [0,-0.9995,-0.026341,0.017418]
     config_path = os.path.join(os.path.dirname(__file__), 'ur3_and_ur3e.yaml')
     config = ConfigModule(config_path)
-    mppi_module = MPPIAdpAnModule(config, desire_abs_pose, desire_abs_position, desire_rel_pose, desire_line_d, desire_quat_line_ref)
+    mppi_module = MPPIKmeansAdpAnModule(config, desire_abs_pose, desire_abs_position, desire_rel_pose, desire_line_d, desire_quat_line_ref)
     mppi_module.warm_up()
-    mppi_module.warm_up2()
     while True:
         mppi_module.play_once()
 

@@ -42,6 +42,8 @@ class ConfigModule():
         self.gamma = config_data.get('gamma',0.1)
         self.an_std = config_data.get('an_std', 0.1)
         self.log_std = config_data.get('log_std', 0.2)
+        self.num_clusters = config_data.get('num_clusters', 3)
+        self.common_num = config_data.get('common_num', 1)
         self.max_acc_abs_value = config_data.get('max_acc_abs_value', 0.6)
         self.max_abs_tilt_angle = config_data.get('max_abs_tilt_angle',5)
         self.min_collision_distance = config_data.get('min_collision_distance', 0.0)

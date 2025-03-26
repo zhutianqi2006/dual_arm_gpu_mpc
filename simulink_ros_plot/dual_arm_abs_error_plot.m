@@ -1,30 +1,31 @@
-h_fig = figure('Name', 'dual_arm_abs_error_plot');
-time_line = 9;
+% 假设data是你的数据矩阵
+time_column = 9; % 时间数据在第9列
+data_columns = 1:8; % 前8列为数据列
 
-% Find the index where any of the first 8 columns is non-zero
-non_zero_index = find(any(out.abs_error.Data(:,1:8) ~= 0, 2), 1, 'first');
+% 查找第一个非零数据行，即前8列至少有一个非零
+first_nonzero_row = find(any(out.abs_error.Data(:, data_columns) ~= 0, 2), 1, 'first');
+start_time = out.abs_error.Data(first_nonzero_row, time_column); % 获取有效数据开始的时间
+end_time = start_time + 30.0; % 计算结束时间
 
-% Adjusting data to start plotting from the first non-zero index
-time_data = out.abs_error.Data(non_zero_index:end, time_line);
-time_start  = out.abs_error.Data(non_zero_index, time_line);
-data_columns = out.abs_error.Data(non_zero_index:end, 1:8);
+% 找到在有效时间范围内的数据行
+valid_rows = out.abs_error.Data(:, time_column) >= start_time & out.abs_error.Data(:, time_column) <= end_time;
 
-% Plotting each error
-for i = 1:8
-    plot(time_data-time_start, data_columns(:,i), 'LineWidth', 2.2, 'LineStyle', '-.');
-    hold on;
-end
+% 提取这些行的前8列
+valid_data = out.abs_error.Data(valid_rows, data_columns);
 
-% Setting plot parameters
-set(gca, 'XLim', [0 15], 'FontSize', 16);
-set(gca, 'YLim', [-0.1, 0.2], 'FontSize', 16);
-set(gca, 'YTick', -0.3:0.05:0.3);
+% 计算每行的平方和
+squared_sums = sum(valid_data.^2, 2);
+
+% 计算每行平方和的平方根
+root_sums = sqrt(squared_sums);
+
+% 获取对应的时间向量
+time_vector = out.abs_error.Data(valid_rows, time_column)-11.95;
+
+% 绘制每一时刻的root_sums
+figure;
+plot(time_vector, root_sums, 'b-', 'LineWidth', 1.5);
+xlabel('Time');
+ylabel('Root Sums');
+title('Root Sums vs Time');
 grid on;
-legend({'$error_1$', '$error_2$', '$error_3$', '$error_4$', '$error_5$', '$error_6$', '$error_7$', '$error_8$'}, ...
-       'FontSize', 16, 'Interpreter', 'latex', 'NumColumns', 2);
-xlabel('Time (s)', 'FontSize', 20, 'Interpreter', 'tex');
-ylabel('Error', 'FontSize', 20, 'Interpreter', 'tex');
-
-% Save the figure
-saveas(h_fig, h_fig.Name, 'fig');
-saveas(h_fig, h_fig.Name, 'svg');

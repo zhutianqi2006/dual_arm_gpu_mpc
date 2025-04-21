@@ -6,7 +6,7 @@
   Dual Quaternion Dual-Arm Manipulator GPU Control
 </p>
 <p align="center">
-<a href="README.md">English</a> | 简体中文
+English | <a href="README_cn.md">简体中文</a> 
 </p>
 
 ## Environment Setup

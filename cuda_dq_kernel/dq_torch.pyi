@@ -34,3 +34,20 @@ def rel_abs_pose_rel_abs_jac(
     theta1: torch.Tensor, theta2: torch.Tensor, 
     line_d: torch.Tensor, quat_line_ref: torch.Tensor,
     ith1:int, ith2:int, dh1_type:int, dh2_type:int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: ...
+
+def rel_dir_rect(
+    desire_rel_pose: torch.Tensor,    # [N, 8]
+    current_rel_pose: torch.Tensor,   # [N, 8]
+    Jxr: torch.Tensor,                # [N, 8, J_cols]
+    robot1_qnum: int,
+    robot2_qnum: int
+) -> torch.Tensor: ...
+
+def project_q_by_constraint_jacobian(
+    dh1: torch.Tensor, dh2: torch.Tensor,
+    base1: torch.Tensor, base2: torch.Tensor,
+    effector1: torch.Tensor, effector2: torch.Tensor,
+    theta1_init: torch.Tensor, theta2_init: torch.Tensor,
+    desire_rel_pose: torch.Tensor,
+    ith1: int, ith2: int, dh1_type: int, dh2_type: int
+) -> Tuple[torch.Tensor, torch.Tensor]: ...

@@ -309,9 +309,10 @@ class MPPIKmeansAdpAnModule():
             abs_cost = get_abs_cost(self.batch_desire_abs_pose, bacth_abs_pos, self.batch_desire_abs_position, batch_abs_position, self.abs_weight, self.abs_position_weight)
             vel_cost = get_vel_cost(batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq, self.q_vel_weight)
             tilt_constraint_cost = get_tilt_constraint_cost(batch_angle, self.batch_max_abs_tilt_angle, self.tilt_constraint_weight)
-            acc_cost = get_acc_cost(batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq, batch_last_mppi_result, self.robot1_q_num, self.robot2_q_num, i, self.q_acc_weight)
+            if i == 0:
+                acc_cost = get_acc_cost(batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq, batch_last_mppi_result, self.robot1_q_num, self.robot2_q_num, i, self.q_acc_weight)
             collision_cost = self.get_collision_cost(self.collision_constraint_weight)
-            self.stage_cost += (abs_cost + vel_cost+ collision_cost + acc_cost + tilt_constraint_cost)
+            self.stage_cost += (abs_cost + vel_cost+ collision_cost + tilt_constraint_cost)
         
         joint_change = torch.square(self.first_batch_fake_robot1_q-self.batch_fake_robot1_q).sum(dim=1, keepdim=True)+torch.square(self.first_batch_fake_robot2_q-self.batch_fake_robot2_q).sum(dim=1, keepdim=True)
         min_joint_change = 0.001
@@ -319,7 +320,7 @@ class MPPIKmeansAdpAnModule():
         stagnation_cost = self.stagnation_weight*joint_change
         abs_terminal_cost = get_abs_cost(self.batch_desire_abs_pose, bacth_abs_pos, self.batch_desire_abs_position, batch_abs_position, self.terminal_abs_weight, self.terminal_abs_position_weight)
         
-        self.stage_cost += abs_terminal_cost + abs_terminal_cost/stagnation_cost
+        self.stage_cost += acc_cost + abs_terminal_cost + abs_terminal_cost/stagnation_cost
        
         
         stage_median_value = torch.median(self.stage_cost)
@@ -360,7 +361,7 @@ class MPPIKmeansAdpAnModule():
         min_energy = self.stage_cost.min()
         min_index = self.stage_cost.argmin()
         cluster_ids_x, cluster_centers = kmeans(
-            X=combined_tensor, num_clusters=num_clusters, distance='euclidean', device=torch.device('cuda:0'))
+            X=combined_tensor, num_clusters=num_clusters, distance='euclidean', device=torch.device('cuda:0'), tol=1e-3)
         stage_cost = self.stage_cost.squeeze()  # 转换为1D张量
         _, indices = torch.topk(stage_cost, k=self.common_num, largest=False)
         indices = indices.cpu()  
@@ -502,6 +503,8 @@ class MPPIKmeansAdpAnModule():
             abs_pose_d = dual_arm_abs_feedback.D()
             abs_position = (2*abs_pose_d*abs_pose_p.conj())
             current_l_quat = abs_pose_p*self.cpu_desire_line_d*abs_pose_p.conj()
+            current_l_quat = current_l_quat.normalize()
+            self.cpu_desire_quat_line_ref = self.cpu_desire_quat_line_ref.normalize()
             angle = 57.2958*math.acos(vec4(current_l_quat).dot(vec4(self.cpu_desire_quat_line_ref)))
             if abs(angle) > self.max_abs_tilt_angle:
                 tilt_cost = 1*self.tilt_constraint_weight

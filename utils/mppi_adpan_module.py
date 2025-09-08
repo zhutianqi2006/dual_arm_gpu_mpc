@@ -435,7 +435,9 @@ class MPPIAdpAnModule():
             abs_pose_d = dual_arm_abs_feedback.D()
             abs_position = (2*abs_pose_d*abs_pose_p.conj())
             current_l_quat = abs_pose_p*self.cpu_desire_line_d*abs_pose_p.conj()
-            angle = 57.2958*math.acos(vec4(current_l_quat).dot(vec4(self.cpu_desire_quat_line_ref)))
+            dot_val = vec4(current_l_quat).dot(vec4(self.cpu_desire_quat_line_ref))
+            dot_val = max(min(dot_val, 1.0), -1.0)  # 限制在 [-1, 1]
+            angle = 57.2958 * math.acos(dot_val)
             if abs(angle) > self.max_abs_tilt_angle:
                 tilt_cost = 1*self.tilt_constraint_weight
             else:
@@ -706,6 +708,7 @@ def get_rel_jacobian_null(jac_batch:torch.Tensor, robot1_q_num:int, robot2_q_num
     J_pinv_J = torch.matmul(J_pinv, jac_batch)
     rel_jacobian_null = batch_i - J_pinv_J
     return rel_jacobian_null.to(torch.float32)
+
 
 # get random acceleration 1
 @torch.jit.script

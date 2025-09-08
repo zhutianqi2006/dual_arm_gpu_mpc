@@ -31,7 +31,7 @@ cpu_dq_dual_arm_model = DQ_CooperativeDualTaskSpace(cpu_robot1, cpu_robot2)
 ########################################################### 
 ################### GPU MODEL Define #####################
 ##########################################################    
-batch_size = 20000
+batch_size = 1
 dh_matrix1 = torch.tensor([
     [0.0, 0.333,   0.0,        0.0, 0],
     [0.0, 0.0,     0.0,    -1.5708, 0],
@@ -71,8 +71,13 @@ rel_pos, bacth_abs_pos, bacth_rel_jacobian, bacth_abs_jacobian, batch_abs_positi
                          batch_line_d, batch_quat_line_ref, 7, 7, 1, 1)
 print(bacth_abs_jacobian)
 print(cpu_dq_dual_arm_model.absolute_pose_jacobian(dual_arm_joint_pos))
+print(rel_pos)
+print(cpu_dq_dual_arm_model.relative_pose(dual_arm_joint_pos))
+# jacobian error
+print(bacth_abs_jacobian[0] - cpu_dq_dual_arm_model.absolute_pose_jacobian(dual_arm_joint_pos))
 print(bacth_abs_pos)
 print( cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos))
+
 ########################################################### 
 ######################  WARM UP ###########################
 ###########################################################   

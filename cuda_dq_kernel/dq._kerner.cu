@@ -1,66 +1,117 @@
 #include <torch/extension.h>
-#include <stdio.h>
+#include <math.h>
+#include <type_traits>
+#include <cmath>
+#include <ATen/cuda/CUDAContext.h>
 //----------------------------- inline 函数------------------------------------
 //----------------------------- inline 函数------------------------------------
 //----------------------------- inline 函数------------------------------------
-template <typename scalar_t>
-__device__ __forceinline__ void mat_mul_inline(const scalar_t* A, const scalar_t* B, scalar_t* C, int M, int K, int N) {
-    for (int row = 0; row < M; ++row) {
-        for (int col = 0; col < N; ++col) {
-            scalar_t sum = 0;
-            for (int k = 0; k < K; ++k) {
-                sum += A[row * K + k] * B[k * N + col];
-            }
-            C[row * N + col] = sum;
-        }
+
+template <typename T>
+__device__ __forceinline__ void coop_vec_copy_to_shared(T* __restrict__ sdst, const T* __restrict__ gsrc, int n) {
+// generic scalar path (why: keep codegen simple for non-float/double)
+for (int i = threadIdx.x; i < n; i += blockDim.x) {
+    sdst[i] = gsrc[i];
+    }
+}
+
+
+__device__ __forceinline__ void coop_vec_copy_to_shared(float* __restrict__ sdst, const float* __restrict__ gsrc, int n) {
+// 128-bit vector path for float
+int nvec = n / 4;
+float4* __restrict__ vs = reinterpret_cast<float4*>(sdst);
+const float4* __restrict__ vg = reinterpret_cast<const float4*>(gsrc);
+for (int i = threadIdx.x; i < nvec; i += blockDim.x) {
+    vs[i] = vg[i];
+    }
+int tail = n - nvec * 4;
+for (int i = threadIdx.x; i < tail; i += blockDim.x) {
+    sdst[n - tail + i] = gsrc[n - tail + i];
+    }
+}
+
+
+__device__ __forceinline__ void coop_vec_copy_to_shared(double* __restrict__ sdst, const double* __restrict__ gsrc, int n) {
+// 128-bit vector path for double
+    int nvec = n / 2;
+    double2* __restrict__ vs = reinterpret_cast<double2*>(sdst);
+    const double2* __restrict__ vg = reinterpret_cast<const double2*>(gsrc);
+    for (int i = threadIdx.x; i < nvec; i += blockDim.x) {
+        vs[i] = vg[i];
+    }
+    int tail = n - nvec * 2;
+    for (int i = threadIdx.x; i < tail; i += blockDim.x) {
+        sdst[n - tail + i] = gsrc[n - tail + i];
     }
 }
 
 template <typename scalar_t>
-__device__ __forceinline__ void mat_mul88_inline(const scalar_t* A, const scalar_t* B, scalar_t* C) {
-    const int M = 8;
-    const int K = 8;
-    const int N = 8;
-
-    // 遍历结果矩阵的每个元素
-    for (int row = 0; row < M; ++row) {
+__device__ __forceinline__ void mat_mul_inline(const scalar_t* __restrict__ A,
+                                               const scalar_t* __restrict__ B,
+                                               scalar_t* __restrict__ C,
+                                               int M, int K, int N) {
+    // Fast path: K == 4
+    if (K == 4) {
+        #pragma unroll
+        for (int row = 0; row < M; ++row) {
+            for (int col = 0; col < N; ++col) {
+                const int a = row * 4;
+                scalar_t s = A[a+0] * B[0*N + col];
+                s +=         A[a+1] * B[1*N + col];
+                s +=         A[a+2] * B[2*N + col];
+                s +=         A[a+3] * B[3*N + col];
+                C[row*N + col] = s;
+            }
+        }
+        return;
+    }
+    // Fast path: K == 8
+    if (K == 8) {
+        #pragma unroll
+        for (int row = 0; row < M; ++row) {
+            for (int col = 0; col < N; ++col) {
+                const int a = row * 8;
+                scalar_t s = A[a+0] * B[0*N + col];
+                s +=         A[a+1] * B[1*N + col];
+                s +=         A[a+2] * B[2*N + col];
+                s +=         A[a+3] * B[3*N + col];
+                s +=         A[a+4] * B[4*N + col];
+                s +=         A[a+5] * B[5*N + col];
+                s +=         A[a+6] * B[6*N + col];
+                s +=         A[a+7] * B[7*N + col];
+                C[row*N + col] = s;
+            }
+        }
+        return;
+    }
+    // Fallback（少数场景）
+    for (int row = 0; row < M; ++row)
         for (int col = 0; col < N; ++col) {
             scalar_t sum = 0;
-            // 计算行列乘积的累加和
-            for (int k = 0; k < K; ++k) {
-                // 注意这里的索引方式进行了修改，以适应一维数组
-                sum += A[row * K + k] * B[k * N + col];
-            }
-            // 存储结果，同样注意索引方式
-            C[row * N + col] = sum;
+            #pragma unroll 1
+            for (int k = 0; k < K; ++k)
+                sum += A[row*K + k] * B[k*N + col];
+            C[row*N + col] = sum;
         }
-    }
 }
 
 template <typename scalar_t>
-__device__ __forceinline__ void mat_mul86_inline(const scalar_t* A, const scalar_t* B, scalar_t* C) {
-    const int M = 8;
-    const int K = 8;
-    const int N = 6;
+__device__ __forceinline__ void mat_mul88_inline(const scalar_t* __restrict__ A,
+                                                 const scalar_t* __restrict__ B,
+                                                 scalar_t* __restrict__ C) {
+    mat_mul_inline(A, B, C, 8, 8, 8);
+}
 
-    // 遍历结果矩阵的每个元素
-    for (int row = 0; row < M; ++row) {
-        for (int col = 0; col < N; ++col) {
-            scalar_t sum = 0;
-            // 计算行列乘积的累加和
-            for (int k = 0; k < K; ++k) {
-                // 注意这里的索引方式进行了修改，以适应一维数组
-                sum += A[row * K + k] * B[k * N + col];
-            }
-            // 存储结果，同样注意索引方式
-            C[row * N + col] = sum;
-        }
-    }
+template <typename scalar_t>
+__device__ __forceinline__ void mat_mul86_inline(const scalar_t* __restrict__ A,
+                                                 const scalar_t* __restrict__ B,
+                                                 scalar_t* __restrict__ C) {
+    mat_mul_inline(A, B, C, 8, 8, 6);
 }
 
 template <typename scalar_t>
 __device__ __forceinline__ void dq_mult_inline(
-    const scalar_t* q1, const scalar_t* q2, scalar_t* result)
+    const scalar_t* __restrict__ q1, const scalar_t* __restrict__ q2, scalar_t* __restrict__ result)
 {
     // 实部四元数的提取
     scalar_t a1 = q1[0], b1 = q1[1], c1 = q1[2], d1 = q1[3];
@@ -85,16 +136,14 @@ __device__ __forceinline__ void dq_mult_inline(
 
 template <typename scalar_t>
 __device__ __forceinline__ void P_inline(const scalar_t* v, scalar_t* translation) {
-    // 示例：假设平移部分存储在 v 的后四位
     for (int i = 0; i < 4; i++) {
         translation[i] = v[i];
     }
 }
 
-// 假设 D(v) 返回四元数的旋转部分
+
 template <typename scalar_t>
 __device__ __forceinline__ void D_inline(const scalar_t* v, scalar_t* rotation) {
-    // 示例：假设旋转部分存储在 v 的前四位
     for (int i = 0; i < 4; i++) {
         rotation[i] = v[4+i];
     }
@@ -192,9 +241,11 @@ __device__ __forceinline__ void norm_inline(const scalar_t* q, scalar_t* result)
         scalar_t conj_aux[8];
         conj_inline(aux, conj_aux); 
         dq_mult_inline(conj_aux, aux, result);  // 双四元数乘法
-
+        if (result[0] < 1e-8) {
+            result[0] = 1e-8; // 防止除以零
+        }
         result[0] = sqrt(result[0]);  // 计算实部的平方根
-        result[4] = result[4] / (2 * result[0]);  // 计算双部除以两倍实部的平方根
+        result[4] = result[4] / (2 * result[0] + 1e-8);  // 计算双部除以两倍实部的平方根
     }
 }
 
@@ -288,6 +339,9 @@ __device__ __forceinline__ void dq_exp_inline(const scalar_t* v, scalar_t* resul
     for (int i = 0; i < 8; i++) {
         phi += prim[i] * prim[i];
     }
+    if (fabs(phi) < 1e-8) {
+        phi = 1e-8; // 防止除以零
+    }
     phi = sqrt(phi);
 
     scalar_t phi_tensor[8] = {sin(phi)/(phi + 1e-8), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -326,8 +380,11 @@ __device__ __forceinline__ void dq_inv_inline(const scalar_t* v, scalar_t* resul
     scalar_t inv_dq_temp[8] = {0.0};
     conj_inline(v, v_conj);
     dq_mult_inline(v, v_conj, aux);
+    if (fabs(aux[0]) < 1e-8) {
+        aux[0] = 1e-8; // 防止除以零
+    }
     inv_dq_temp[0] = 1.0 / aux[0];
-    inv_dq_temp[4] = -aux[4] / pow(aux[0], 2);
+    inv_dq_temp[4] = -aux[4] / (pow(aux[0], 2)+1e-8);
     dq_mult_inline(v_conj, inv_dq_temp, result);
 }
 
@@ -528,32 +585,27 @@ __device__ __forceinline__ void mdh2dq_inline(const scalar_t* dh, const scalar_t
 }
 
 template <typename scalar_t>
-__device__ __forceinline__ void get_w_inline(const scalar_t* dh, const int ith, const int dh_type, scalar_t* w)
+__device__ __forceinline__ void get_w_inline(const scalar_t* __restrict__ dh, const int ith, const int dh_type, scalar_t* w)
 {
-    if (dh_type == 1) { // Assuming dh_type 1 indicates 'mdh'
+    if (dh_type == 1) {
         scalar_t alpha = dh[3 + ith * 5];
-        scalar_t a = dh[2 + ith * 5];
-        w[0] = 0;
-        w[1] = 0;
-        w[2] = -sinf(alpha);
-        w[3] = cosf(alpha);
-        w[4] = 0;
-        w[5] = 0;
-        w[6] = -a * cosf(alpha);
-        w[7] = -a * sinf(alpha);
+        scalar_t a     = dh[2 + ith * 5];
+        scalar_t s, c;
+        if constexpr (std::is_same<scalar_t, float>::value) {
+            __sincosf(alpha, &s, &c);
+        } else {
+            sincos(alpha, &s, &c);
+        }
+        w[0]=0; w[1]=0; w[2]=-s; w[3]= c;
+        w[4]=0; w[5]=0; w[6]=-a*c; w[7]=-a*s;
     } else {
-        w[0] = 0;
-        w[1] = 0;
-        w[2] = 0;
-        w[3] = 1;
-        w[4] = 0;
-        w[5] = 0;
-        w[6] = 0;
-        w[7] = 0;
+        w[0]=0; w[1]=0; w[2]=0; w[3]=1;
+        w[4]=0; w[5]=0; w[6]=0; w[7]=0;
     }
-} 
+}
 
-#define MAX_ITH 20  // Define an appropriate maximum value
+
+#define MAX_ITH 10  // Define an appropriate maximum value
 
 template <typename scalar_t>
 __device__ __forceinline__ void rel_abs_pose_rel_jac_inline(const scalar_t* dh1, const scalar_t* dh2,
@@ -709,6 +761,7 @@ __device__ __forceinline__ void rel_abs_pose_rel_jac_inline(const scalar_t* dh1,
     q_angle_inline(l_c, quat_line_ref, angle);
     dq_position_inline(abs_pose, abs_position);
 }
+
 
 template <typename scalar_t>
 __device__ __forceinline__ void rel_abs_pose_rel_abs_jac_inline(const scalar_t* dh1, const scalar_t* dh2,
@@ -993,6 +1046,227 @@ __device__ __forceinline__ void rel_abs_pose_rel_abs_jac_inline(const scalar_t* 
     }
 }
 
+
+template <typename scalar_t>
+__device__ __forceinline__ void rel_dir_rect_inline(
+    const scalar_t* desire_rel_pose,
+    const scalar_t* current_rel_pose,
+    const scalar_t* Jxr_flat,      // 扁平的 8 x J_cols 矩阵基地址
+    int robot1_qnum,
+    int robot2_qnum,                   // 列数 = robot1_qnum + robot2_qnum
+    scalar_t* joint_vel_dir         // 输出 robot1_qnum + robot2_qnum
+)
+{
+    scalar_t conj_rel_pose[8] = {0.0};
+    scalar_t dq_tmp[8] = {0.0};
+    scalar_t desire_rel_hm8[64] = {0.0};
+    scalar_t temp_mat1[64] = {0.0};
+    scalar_t d8[64] = {0.0};
+    scalar_t N[8*2* MAX_ITH] = {0.0};
+    int J_cols = robot1_qnum + robot2_qnum;
+    for (int i = 0; i < 8; ++i) {
+        d8[i * 8 + i] = (i == 0 || i == 4) ? 1.0 : -1.0;
+    }
+
+    conj_inline(current_rel_pose, conj_rel_pose);
+    dq_mult_inline(conj_rel_pose, desire_rel_pose, dq_tmp);
+    dq_tmp[0] = 1.0 - dq_tmp[0];
+    for (int i = 1; i < 8; ++i) dq_tmp[i] = -dq_tmp[i];
+
+    haminus8_inline(desire_rel_pose, desire_rel_hm8);
+    mat_mul88_inline(desire_rel_hm8, d8, temp_mat1);
+
+    mat_mul_inline(temp_mat1, Jxr_flat, N, 8, 8, J_cols);
+    // 将 N (8 x J_cols) 按列与 dq_tmp 点乘，得到每个关节的方向（长度 J_cols）
+    for (int j = 0; j < J_cols; ++j) {
+        scalar_t acc = 0;
+        for (int i = 0; i < 8; ++i) {
+            acc += N[i * J_cols + j] * dq_tmp[i]; // N stored row-major: row*cols + col
+        }
+        joint_vel_dir[j] = acc;
+    }
+
+}
+
+
+template <typename scalar_t>
+__device__ __forceinline__ void project_q_by_constraint_jacobian_inline(const scalar_t* __restrict__ dh1, const scalar_t* __restrict__ dh2,
+                                                                        const scalar_t* __restrict__ base1, const scalar_t* __restrict__ base2,
+                                                                        const scalar_t* __restrict__ effector1, const scalar_t* __restrict__ effector2,
+                                                                        const scalar_t* __restrict__ theta1_init, const scalar_t* __restrict__ theta2_init,
+                                                     const int ith1, const int ith2,
+                                                     const scalar_t* desire_rel_pose,
+                                                     scalar_t* __restrict__ project_theta1, scalar_t* __restrict__ project_theta2,
+                                                     const int dh1_type, const int dh2_type)
+{
+    // Ensure ith1 and ith2 do not exceed MAX_ITH
+    if (ith1 > MAX_ITH || ith2 > MAX_ITH) {
+        return;
+    }
+
+    const int J_cols = ith1 + ith2;
+    // local copies of thetas we will update
+    scalar_t theta1_local[MAX_ITH];
+    scalar_t theta2_local[MAX_ITH];
+    for (int i = 0; i < ith1; ++i) theta1_local[i] = theta1_init[i];
+    for (int i = 0; i < ith2; ++i) theta2_local[i] = theta2_init[i];
+
+    // temporaries (kept similar to original)
+    scalar_t x_effector1[8], x_effector2[8], x1[8], x2[8];
+    scalar_t j1[8] = {0.0};
+    scalar_t j2[8] = {0.0};
+    scalar_t z1[8] = {0.0};
+    scalar_t z2[8] = {0.0};
+    scalar_t a1[8] = {0.0};
+    scalar_t a2[8] = {0.0};
+    scalar_t A1[8 * MAX_ITH], A2[8 * MAX_ITH];
+    scalar_t J1[8 * MAX_ITH], J2[8 * MAX_ITH];
+    scalar_t w[8] = {0, 0, 0, 1, 0, 0, 0, 0};
+    scalar_t base1_hp8[64], base2_hp8[64], base1_hm8[64], base2_hm8[64];
+    scalar_t effector1_hm8[64], effector2_hm8[64];
+    scalar_t J1_temp1[64], J2_temp1[64];
+    scalar_t J1_temp2[8 * MAX_ITH], J2_temp2[8 * MAX_ITH];
+    scalar_t x_effector1_sqrt[8] = {0.0};
+    scalar_t x_effector2_conj[8] = {0.0};
+    scalar_t C8[64];
+    scalar_t d8[64] = {0.0};
+    scalar_t hp8_x_effector2_conj[64], hm8_x_effector1[64];
+    scalar_t Jxr1_temp[8 * MAX_ITH], Jxr2_temp[8 * MAX_ITH], Jxr2_C8[64];
+    scalar_t rel_pose[8] = {0.0};
+    // scratch for flattened Jxr passed into rel_dir_rect_inline (row-major 8 x J_cols)
+    scalar_t Jxr_flat[8 * (2 * MAX_ITH)] = {0.0};
+    // joint direction
+    scalar_t joint_vel_dir[2 * MAX_ITH] = {0.0};
+
+    // initialize constants
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++){
+            C8[j + i*8] = 0;
+        }
+    }
+    C8[0] =  1; C8[9] = -1; C8[18] = -1; C8[27] = -1;
+    C8[36] =  1; C8[45] = -1; C8[54] = -1; C8[63] = -1;
+    for (int i = 0; i < 8; ++i) {
+        d8[i * 8 + i] = (i == 0 || i == 4) ? 1.0 : -1.0;
+    }
+
+    // iteration parameters
+    const int max_iters = 5;
+    const scalar_t alpha = (scalar_t)0.6; // step size (tunable)
+
+    for (int iter = 0; iter < max_iters; ++iter) {
+        // reset pose and accumulators
+        for (int i = 0; i < 8; i++) {
+            x_effector1[i] = (i == 0) ? 1 : 0;
+            x_effector2[i] = (i == 0) ? 1 : 0;
+            x1[i] = (i == 0) ? 1 : 0;
+            x2[i] = (i == 0) ? 1 : 0;
+        }
+        // build A1, effector for robot1 using current theta1_local
+        for(int i = 0; i < ith1; i++)
+        {
+            if (dh1_type == 1) {
+                mdh2dq_inline(dh1, theta1_local, i, a1);
+            } else {
+                dh2dq_inline(dh1, theta1_local, i, a1);
+            }
+            dq_mult_inline(x_effector1, a1, x_effector1);
+            for (int j = 0; j < 8; j++) A1[j + i * 8] = a1[j];
+        }
+
+        // build A2, effector for robot2 using current theta2_local
+        for(int i = 0; i < ith2; i++)
+        {
+            if (dh2_type == 1) {
+                mdh2dq_inline(dh2, theta2_local, i, a2);
+            } else {
+                dh2dq_inline(dh2, theta2_local, i, a2);
+            }
+            dq_mult_inline(x_effector2, a2, x_effector2);
+            for (int j = 0; j < 8; j++) A2[j + i * 8] = a2[j];
+        }
+
+        // compute Jacobians J1, J2 (rotation part) using current transforms
+        for(int i = 0; i < ith1; i++) {
+            get_w_inline(dh1, i, dh1_type, w);
+            Ad_inline(x1, w, z1);
+            for (int j = 0; j < 8; j++) z1[j] *= 0.5;
+            dq_mult_inline(x1, &A1[i * 8], x1);
+            dq_mult_inline(z1, x_effector1, j1);
+            for (int j = 0; j < 8; j++) J1[j * ith1 + i] = j1[j];
+        }
+        for (int i = 0; i < ith2; i++) {
+            get_w_inline(dh2, i, dh2_type, w);
+            Ad_inline(x2, w, z2);
+            for (int j = 0; j < 8; j++) z2[j] *= 0.5;
+            dq_mult_inline(x2, &A2[i * 8], x2);
+            dq_mult_inline(z2, x_effector2, j2);
+            for (int j = 0; j < 8; j++) J2[j * ith2 + i] = j2[j];
+        }
+        // compute relative pose and partial Jxr blocks
+        hamiplus8_inline(base1, base1_hp8);
+        hamiplus8_inline(base2, base2_hp8);
+        haminus8_inline(effector1, effector1_hm8);
+        haminus8_inline(effector2, effector2_hm8);
+        mat_mul88_inline(base1_hp8, effector1_hm8, J1_temp1);
+        mat_mul88_inline(base2_hp8, effector2_hm8, J2_temp1);
+        mat_mul_inline(J1_temp1, J1, J1_temp2, 8, 8, ith1);
+        mat_mul_inline(J2_temp1, J2, J2_temp2, 8, 8, ith2);
+        dq_mult_inline(base1, x_effector1, x_effector1);
+        dq_mult_inline(base2, x_effector2, x_effector2);
+        dq_mult_inline(x_effector1, effector1, x_effector1);
+        dq_mult_inline(x_effector2, effector2, x_effector2);
+        conj_inline(x_effector2, x_effector2_conj);
+
+
+        // rel pose
+        dq_mult_inline(x_effector2_conj, x_effector1, rel_pose);
+
+        // compute Jxr blocks as in other helpers
+        hamiplus8_inline(x_effector2_conj, hp8_x_effector2_conj);
+        haminus8_inline(x_effector1, hm8_x_effector1);
+        mat_mul_inline(hp8_x_effector2_conj, J1_temp2, Jxr1_temp, 8, 8, ith1);
+        mat_mul88_inline(hm8_x_effector1, C8, Jxr2_C8);
+        mat_mul_inline(Jxr2_C8, J2_temp2, Jxr2_temp, 8, 8, ith2);
+
+        // flatten Jxr into row-major 8 x J_cols for rel_dir_rect_inline
+        for (int row = 0; row < 8; ++row) {
+            for (int col = 0; col < J_cols; ++col) {
+                if (col < ith1) {
+                    // Jxr1_temp has layout: for row r, data starts at r*ith1
+                    Jxr_flat[row * J_cols + col] = Jxr1_temp[col + ith1 * row];
+                } else {
+                    Jxr_flat[row * J_cols + col] = Jxr2_temp[(col - ith1) + ith2 * row];
+                }
+            }
+        }
+
+        // compute joint direction using current rel_pose and desired pose
+        rel_dir_rect_inline<scalar_t>(
+                    desire_rel_pose, rel_pose,
+                    Jxr_flat, ith1, ith2,
+                    joint_vel_dir
+                    );
+
+        // update thetas (simple gradient-like step)
+        for (int j = 0; j < ith1; ++j) {
+            theta1_local[j] += alpha * joint_vel_dir[j];
+        }
+        for (int j = 0; j < ith2; ++j) {
+            theta2_local[j] += alpha * joint_vel_dir[ith1 + j];
+        }
+
+        // check convergence: use upd_norm or the residual between current rel_pose and desired
+
+        // continue to next iteration (recompute everything with updated thetas)
+    }
+
+    // write back results into provided project arrays
+    for (int i = 0; i < ith1; ++i) project_theta1[i] = theta1_local[i];
+    for (int i = 0; i < ith2; ++i) project_theta2[i] = theta2_local[i];
+}
+
+
 //----------------------------- kernel 函数------------------------------------
 //----------------------------- kernel 函数------------------------------------
 //----------------------------- kernel 函数------------------------------------
@@ -1178,8 +1452,11 @@ __global__ void norm_kernel(
 
         scalar_t real_part = result[0];
         scalar_t dual_part = result[4];
-
+        real_part = max(real_part, scalar_t(0.0));  // 防止负数的平方根
         norm[idx][0] = sqrt(real_part);
+        if (abs(norm[idx][0]) < 1e-8) {
+            norm[idx][0] = 1e-8; // 防止除以零
+        }
         norm[idx][4] = dual_part / (2 * norm[idx][0]);
     }
 }
@@ -1463,6 +1740,83 @@ __global__ void rel_abs_pose_rel_abs_jac_kernel(
     }
 }
 
+template <typename scalar_t>
+__global__ void rel_dir_rect_kernel(
+    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> desire_rel_pose, // [N,8]
+    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> current_rel_pose, // [N,8]
+    const torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> Jxr, // [N,8,J_cols]
+    int robot1_qnum,
+    int robot2_qnum,
+    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> joint_vel_dir // [N, J_cols]
+)
+{
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int N = desire_rel_pose.size(0);
+    if (idx >= N) return;
+
+    const scalar_t* desire_ptr = &desire_rel_pose[idx][0];
+    const scalar_t* current_ptr = &current_rel_pose[idx][0];
+    const scalar_t* Jxr_flat_ptr = &Jxr[idx][0][0]; // 扁平 8 x J_cols 基址
+    scalar_t* out_ptr = &joint_vel_dir[idx][0];
+
+    // 调用内联实现（在本文件中已定义）
+    rel_dir_rect_inline<scalar_t>(
+        desire_ptr,
+        current_ptr,
+        Jxr_flat_ptr,
+        robot1_qnum,
+        robot2_qnum,
+        out_ptr
+    );
+}
+
+
+template <typename scalar_t>
+__global__ __launch_bounds__(256, 2) void project_q_by_constraint_jacobian_kernel(
+const torch::PackedTensorAccessor<scalar_t, 1, torch::RestrictPtrTraits, size_t> dh1,
+const torch::PackedTensorAccessor<scalar_t, 1, torch::RestrictPtrTraits, size_t> dh2,
+const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> base1,
+const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> base2,
+const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> effector1,
+const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> effector2,
+const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> theta1_init,
+const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> theta2_init,
+const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> desire_rel_pose,
+int ith1, int ith2, int dh1_type, int dh2_type,
+torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> project_theta1,
+torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> project_theta2)
+{
+const int N = theta1_init.size(0);
+
+
+// --- vectorized cooperative load of DH arrays to shared ---
+extern __shared__ __align__(16) unsigned char shmem_raw[];
+scalar_t* __restrict__ sh_dh1 = reinterpret_cast<scalar_t*>(shmem_raw);
+const int dh1_len = dh1.size(0);
+scalar_t* __restrict__ sh_dh2 = reinterpret_cast<scalar_t*>(shmem_raw + sizeof(scalar_t) * dh1_len);
+const int dh2_len = dh2.size(0);
+
+
+// why: fewer global transactions, lower latency
+coop_vec_copy_to_shared<scalar_t>(sh_dh1, &dh1[0], dh1_len);
+coop_vec_copy_to_shared<scalar_t>(sh_dh2, &dh2[0], dh2_len);
+__syncthreads();
+
+
+// --- grid-stride to cover N ---
+for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < N; idx += blockDim.x * gridDim.x) {
+project_q_by_constraint_jacobian_inline<scalar_t>(
+sh_dh1, sh_dh2,
+&base1[idx][0], &base2[idx][0],
+&effector1[idx][0], &effector2[idx][0],
+&theta1_init[idx][0], &theta2_init[idx][0],
+ith1, ith2,
+&desire_rel_pose[idx][0],
+&project_theta1[idx][0], &project_theta2[idx][0],
+dh1_type, dh2_type
+);
+}
+}
 
 //----------------------------- cuda 函数------------------------------------
 //----------------------------- cuda 函数------------------------------------
@@ -1896,4 +2250,93 @@ int ith1, int ith2, int dh1_type, int dh2_type)
     }));
     cudaDeviceSynchronize();
     return std::make_tuple(rel_results, abs_results, jxr_results, jxa_results, abs_position_results, angle);
+}
+
+
+torch::Tensor rel_dir_rect_cuda(
+    torch::Tensor desire_rel_pose, // [N,8]
+    torch::Tensor current_rel_pose, // [N,8]
+    torch::Tensor Jxr,              // [N,8,J_cols]
+    int robot1_qnum,
+    int robot2_qnum
+) {
+    const int N = desire_rel_pose.size(0);
+    const int J_cols = robot1_qnum + robot2_qnum;
+    torch::Tensor joint_vel_dir = torch::zeros({N, J_cols}, desire_rel_pose.options());
+
+    const int threads = 256;
+    const dim3 blocks((N + threads - 1) / threads);
+
+    AT_DISPATCH_FLOATING_TYPES(desire_rel_pose.type(), "rel_dir_rect_kernel", ([&] {
+        rel_dir_rect_kernel<scalar_t><<<blocks, threads>>>(
+            desire_rel_pose.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+            current_rel_pose.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+            Jxr.packed_accessor<scalar_t, 3, torch::RestrictPtrTraits, size_t>(),
+            robot1_qnum,
+            robot2_qnum,
+            joint_vel_dir.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>()
+        );
+    }));
+    // cudaDeviceSynchronize(); // 根据需要解除注释
+    return joint_vel_dir;
+}
+
+std::tuple<torch::Tensor, torch::Tensor> project_q_by_constraint_jacobian_cuda(
+    torch::Tensor dh1, torch::Tensor dh2,
+    torch::Tensor base1, torch::Tensor base2,
+    torch::Tensor effector1, torch::Tensor effector2,
+    torch::Tensor theta1_init, torch::Tensor theta2_init,
+    torch::Tensor desire_rel_pose,
+    int ith1, int ith2, int dh1_type, int dh2_type)
+{
+    const int N = theta1_init.size(0);
+
+
+    // Ensure contiguous memory for fully coalesced access
+    dh1 = dh1.contiguous();
+    dh2 = dh2.contiguous();
+    base1 = base1.contiguous();
+    base2 = base2.contiguous();
+    effector1 = effector1.contiguous();
+    effector2 = effector2.contiguous();
+    theta1_init = theta1_init.contiguous();
+    theta2_init = theta2_init.contiguous();
+    desire_rel_pose = desire_rel_pose.contiguous();
+
+
+    // Outputs
+    torch::Tensor proj_theta1 = torch::zeros({N, ith1}, theta1_init.options());
+    torch::Tensor proj_theta2 = torch::zeros({N, ith2}, theta2_init.options());
+
+
+    const int threads = 256;
+    int sms = at::cuda::getCurrentDeviceProperties()->multiProcessorCount;
+    int blocks = std::min((N + threads - 1) / threads, sms * 8);
+
+
+    auto stream = at::cuda::getCurrentCUDAStream();
+
+
+    AT_DISPATCH_FLOATING_TYPES(theta1_init.type(), "project_q_by_constraint_jacobian_kernel", ([&] {
+    size_t shm_bytes = sizeof(scalar_t) * (dh1.numel() + dh2.numel());
+    shm_bytes = (shm_bytes + 15) & ~size_t(15);
+    project_q_by_constraint_jacobian_kernel<scalar_t>
+    <<<blocks, threads, shm_bytes, stream>>>(
+    dh1.packed_accessor<scalar_t, 1, torch::RestrictPtrTraits, size_t>(),
+    dh2.packed_accessor<scalar_t, 1, torch::RestrictPtrTraits, size_t>(),
+    base1.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+    base2.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+    effector1.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+    effector2.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+    theta1_init.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+    theta2_init.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+    desire_rel_pose.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+    ith1, ith2, dh1_type, dh2_type,
+    proj_theta1.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+    proj_theta2.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>()
+    );
+    }));
+
+
+    return std::make_tuple(proj_theta1, proj_theta2);
 }

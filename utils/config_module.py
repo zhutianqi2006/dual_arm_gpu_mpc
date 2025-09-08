@@ -1,7 +1,6 @@
 
 # Python standard lib
 import os
-import torch
 import yaml
 
 class ConfigModule():
@@ -55,8 +54,10 @@ class ConfigModule():
         self.q_vel_constraint_weight = config_data.get('q_vel_constraint_weight', 0.1)
         self.tilt_constraint_weight = config_data.get('tilt_constraint_weight', 0.1)
         self.abs_weight = config_data.get('abs_weight', 0.1)
+        self.rel_weight = config_data.get('rel_weight', 0.1)
         self.abs_position_weight = config_data.get('abs_position_weight', 0.1)
         self.terminal_abs_weight = config_data.get('terminal_abs_weight', 0.1)
+        self.terminal_rel_weight = config_data.get('terminal_rel_weight', 0.1)
         self.terminal_abs_position_weight = config_data.get('terminal_abs_position_weight', 0.1)
         self.q_acc_weight = config_data.get('q_acc_weight', 0.1)
         self.q_vel_weight = config_data.get('q_vel_weight', 0.1)

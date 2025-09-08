@@ -63,7 +63,7 @@ q_vel_weight: 0.0
 stagnation_weight: 10.0
 #stagnation_weight: 8.0
 terminal_abs_weight: 100.0
-terminal_abs_position_weight: 0.0
+terminal_abs_position_weight: 100.0
 # high-level tradtition control parameters
 high_rel_gain: 0.02
 high_abs_gain: 2.0
@@ -72,7 +72,7 @@ rel_gain: 1.0
 abs_gain: 1.0
 # function c to change conrtoller
 c_abs_max: 0.4
-c_eta: 0.4
+c_eta: 0.0
 # joint position limits
 robot1_q_min: [-6.0, -6.0, -6.0, -6.0, -6.0, -6.0]
 robot1_q_max: [6.0, 6.0, 6.0, 6.0, 6.0, 6.0]

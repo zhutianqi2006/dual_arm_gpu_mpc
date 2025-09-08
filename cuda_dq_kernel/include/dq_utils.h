@@ -36,3 +36,19 @@ torch::Tensor effector1, torch::Tensor effector2,
 torch::Tensor theta1, torch::Tensor theta2,
 torch::Tensor line_d, torch::Tensor quat_line_ref,
 int ith1, int ith2, int dh1_type, int dh2_type);
+torch::Tensor rel_dir_rect_cuda(
+    torch::Tensor desire_rel_pose,   // [N,8]
+    torch::Tensor current_rel_pose,  // [N,8]
+    torch::Tensor Jxr,               // [N,8,J_cols]
+    int robot1_qnum,
+    int robot2_qnum
+);
+
+std::tuple<torch::Tensor, torch::Tensor> project_q_by_constraint_jacobian_cuda(
+    torch::Tensor dh1, torch::Tensor dh2,
+    torch::Tensor base1, torch::Tensor base2,
+    torch::Tensor effector1, torch::Tensor effector2,
+    torch::Tensor theta1_init, torch::Tensor theta2_init,
+    torch::Tensor desire_rel_pose,
+    int ith1, int ith2, int dh1_type, int dh2_type
+);

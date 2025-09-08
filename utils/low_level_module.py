@@ -6,14 +6,10 @@ import numpy as np
 import math
 from math import pi
 import threading
-import torch
 # curobo for collision detection
 from dqrobotics import i_, j_, k_, E_, DQ, vec8 ,vec4
 from dqrobotics.robot_modeling import DQ_SerialManipulatorDH,DQ_SerialManipulatorMDH, DQ_CooperativeDualTaskSpace
-from curobo.types.base import TensorDeviceType
-from curobo.wrap.model.robot_world import RobotWorld, RobotWorldConfig
 # DQ Robotics used in cuda
-from dq_torch import rel_abs_pose_rel_jac
 from utils.config_module import ConfigModule
 from utils.low_ros_module import LowROSModule
 # ROS
@@ -73,6 +69,7 @@ class LowLevelModule():
         self.send_u()
         self.ros_module.publish_abs_error_data(vec8(self.desire_abs_pose), vec8(self.dual_arm_abs_feedback))
         self.ros_module.publish_current_abs_pose(vec8(self.dual_arm_abs_feedback))
+        self.ros_module.publish_current_abs_position(vec4(self.dual_arm_abs_feedback.translation()))
 
 
     def update_joint_states(self):

@@ -50,13 +50,13 @@ dh_matrix2 = torch.tensor([
     [0.0, 0.0,     0.0,     1.5708, 0],
     [0.0, 0.0,   0.088,   1.5708, 0]
 ], dtype=torch.float32, device= "cuda:0") 
-dual_arm_joint_pos = [0.5, 0.5, 0.5 ,0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 ,0.5, 0.5, 0.5, 0.5]
+dual_arm_joint_pos = [0.4, 0.5, 0.2 ,0.5, 0.2, 0.5, 0.1, 0.5, 0.3, 0.5 ,0.1, 0.5, 0.2, 0.5]
 batch_robot1_base = torch.tensor([1, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
 batch_robot2_base = torch.tensor([1, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
 batch_robot1_effector = torch.tensor([1, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
 batch_robot2_effector = torch.tensor([1, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
-q_vec1 = torch.tensor([0.5, 0.5, 0.5 ,0.5, 0.5, 0.5, 0.5], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1) 
-q_vec2 = torch.tensor([0.5, 0.5, 0.5 ,0.5, 0.5, 0.5, 0.5], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
+q_vec1 = torch.tensor([0.4, 0.5, 0.2 ,0.5, 0.2, 0.5, 0.1], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1) 
+q_vec2 = torch.tensor([0.5, 0.3, 0.5 ,0.1, 0.5, 0.2, 0.5], dtype=torch.float32, device= "cuda:0").repeat(batch_size, 1)
 dh_matrix1 = dh_matrix1.reshape(-1)
 dh_matrix2 = dh_matrix2.reshape(-1)
 desire_line_d = [0,0,0,1]

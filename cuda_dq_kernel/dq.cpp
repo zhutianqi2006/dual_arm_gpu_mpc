@@ -115,6 +115,47 @@ int ith1, int ith2 ,int dh1_type, int dh2_type)
     return rel_abs_pose_rel_abs_jac_cuda(dh1, dh2, base1, base2, effector1, effector2, theta1, theta2, line_d, quat_line_ref, ith1, ith2, dh1_type ,dh2_type);
 }
 
+torch::Tensor rel_dir_rect(
+    torch::Tensor desire_rel_pose,   // [N,8]
+    torch::Tensor current_rel_pose,  // [N,8]
+    torch::Tensor Jxr,               // [N,8,J_cols]
+    int robot1_qnum,
+    int robot2_qnum
+) {
+    CHECK_INPUT(desire_rel_pose);
+    CHECK_INPUT(current_rel_pose);
+    CHECK_INPUT(Jxr);
+    return rel_dir_rect_cuda(desire_rel_pose, current_rel_pose, Jxr, robot1_qnum, robot2_qnum);
+}
+
+std::tuple<torch::Tensor, torch::Tensor> project_q_by_constraint_jacobian(
+    torch::Tensor dh1, torch::Tensor dh2,
+    torch::Tensor base1, torch::Tensor base2,
+    torch::Tensor effector1, torch::Tensor effector2,
+    torch::Tensor theta1_init, torch::Tensor theta2_init,
+    torch::Tensor desire_rel_pose,
+    int ith1, int ith2, int dh1_type, int dh2_type)
+{
+    CHECK_INPUT(dh1);
+    CHECK_INPUT(dh2);
+    CHECK_INPUT(base1);
+    CHECK_INPUT(base2);
+    CHECK_INPUT(effector1);
+    CHECK_INPUT(effector2);
+    CHECK_INPUT(theta1_init);
+    CHECK_INPUT(theta2_init);
+    CHECK_INPUT(desire_rel_pose);
+
+    return project_q_by_constraint_jacobian_cuda(
+        dh1, dh2,
+        base1, base2,
+        effector1, effector2,
+        theta1_init, theta2_init,
+        desire_rel_pose,
+        ith1, ith2, dh1_type, dh2_type
+    );
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("dq_mult", &dq_mult);
     m.def("P", &P);
@@ -136,4 +177,17 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("haminus8", &haminus8);
     m.def("rel_abs_pose_rel_jac", &rel_abs_pose_rel_jac);
     m.def("rel_abs_pose_rel_abs_jac", &rel_abs_pose_rel_abs_jac);
+    m.def("rel_dir_rect", &rel_dir_rect);
+    m.def("project_q_by_constraint_jacobian", &project_q_by_constraint_jacobian);
 }
+
+
+
+// File: dq_mult_inline_fix.cuh
+// Drop-in replacement for dq_mult_inline with alias safety.
+// - Detects in-place calls (result == q1 or result == q2) and copies inputs to temporaries.
+// - Removes __restrict__ on parameters to avoid UB when pointers alias.
+// - Computes into local scalars, then writes out once.
+
+
+

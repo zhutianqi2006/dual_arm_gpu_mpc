@@ -58,7 +58,7 @@ abs_weight: 0.0
 abs_position_weight: 0.0
 q_acc_weight: 0.0
 q_vel_weight: 0.0
-stagnation_weight: 10.0
+stagnation_weight: 20.0
 #stagnation_weight: 8.0
 terminal_abs_weight: 100.0
 terminal_abs_position_weight: 0.0

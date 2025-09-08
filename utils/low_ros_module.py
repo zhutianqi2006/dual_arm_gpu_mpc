@@ -71,6 +71,11 @@ class LowROSModule(Node):
             self.current_abs_pose_msg.data[i] = current_abs_pose[i]
         self.current_abs_pose_pub.publish(self.current_abs_pose_msg)
 
+    def publish_current_abs_position(self, current_abs_position):
+        for i in range(4):
+            self.current_abs_position_msg.data[i] = current_abs_position[i]
+        self.current_abs_position_pub.publish(self.current_abs_position_msg)
+
     def setup_ros2(self):
         # init robot1 ros2 for control
         self.robot1_q_msg = JointState()
@@ -132,6 +137,13 @@ class LowROSModule(Node):
             'current_abs_pose',
             1)
 
+        # current abs position
+        self.current_abs_position_msg = Float64MultiArray()
+        self.current_abs_position_msg.data = [0.0] * 4
+        self.current_abs_position_pub = self.create_publisher(
+            Float64MultiArray,
+            'current_abs_position',
+            1)
         
     def high_level_u_callback(self, msg: Float64MultiArray):
         self.high_level_u = list(msg.data)

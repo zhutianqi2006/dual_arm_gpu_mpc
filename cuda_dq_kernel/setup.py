@@ -15,8 +15,15 @@ setup(
             name='dq_torch',  # import name
             sources=sources,
             include_dirs=include_dirs,
-            extra_compile_args={'cxx': ['-O2'],
-                                'nvcc': ['-O2']}
+            extra_compile_args={
+                "cxx": ["-O3", "-DNDEBUG", "-std=c++17"],
+                "nvcc": [
+                "-O3", "-DNDEBUG", "-std=c++17",
+                "--expt-relaxed-constexpr",
+                "-lineinfo", "-Xptxas", "-O3",
+                "-use_fast_math",
+                "-Xptxas", "-dlcm=ca",],
+                }
         ),
     ],
     cmdclass={

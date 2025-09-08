@@ -1,0 +1,3 @@
+#!/home/echoz/upload_code/dual_arm_gpu_mpc/envs/ddp/bin/python3.10
+from cmeel.run import cmeel_run
+cmeel_run()

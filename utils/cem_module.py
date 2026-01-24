@@ -53,7 +53,7 @@ import os
 import time
 import math
 import threading
-from typing import Tuple
+from typing import Tuple, List, Dict, Union, Optional
 
 import numpy as np
 import torch
@@ -159,16 +159,25 @@ class CEMModule:
         self.high_rel_gain = config.high_rel_gain
         self.high_abs_gain = config.high_abs_gain
 
+        # Controller switching (match MPPIAdpAnModule behavior)
+        self.c_abs_max = getattr(config, "c_abs_max", 0.4)
+        self.c_eta = getattr(config, "c_eta", 0.0)
+        self.c = 0.0
+
         # curobo config files
         self.curobo_world_file = config.curobo_world_file
         self.curobo_robot_file = config.curobo_robot_file
 
         # CEM hyper-parameters (with sensible defaults)
-        self.cem_elite_frac = getattr(config, "cem_elite_frac", 0.03)
-        self.cem_iters = getattr(config, "cem_iters", 5)
+        self.cem_elite_frac = getattr(config, "cem_elite_frac", 0.01)
+        self.cem_iters = getattr(config, "cem_iters", 100)
         self.cem_alpha = getattr(config, "cem_alpha", 0.8)  # higher -> track elites more
-        self.init_std = getattr(config, "cem_init_std", config.std)
+        self.init_std = getattr(config, "cem_init_std", 3.0)
         self.decay = getattr(config, "cem_decay", 1.0)      # std decay per control step
+
+        # One-pole low-pass smoothing on planned sequence (match request: replace moving-average)
+        # y[t] = a*y[t-1] + (1-a)*x[t]
+        self.cem_lpf_alpha = float(getattr(config, "cem_lpf_alpha", 0.0))
 
         # Internal buffers
         self._init_cpu_dq_model()
@@ -179,43 +188,75 @@ class CEMModule:
         self.ros_module = HighROSModule(config)
         self.ros_thread = threading.Thread(target=self.ros_module.run)
         self.ros_thread.start()
+        self.start_time = time.time()
+
+    def moving_average_filter(self, xx: torch.Tensor, window_size: int) -> torch.Tensor:
+        """Apply moving average filter for smoothing input sequence, using numpy internally."""
+        if window_size <= 1:
+            return xx
+        xx_np = xx.detach().cpu().numpy()
+        b = np.ones(int(window_size)) / float(window_size)
+        num_steps, num_controls = xx_np.shape
+        xx_mean_np = np.zeros_like(xx_np)
+        for d in range(num_controls):
+            xx_mean_np[:, d] = np.convolve(xx_np[:, d], b, mode="same")
+        return torch.from_numpy(xx_mean_np).to(xx.device)
+
+    def low_pass_filter(self, xx: torch.Tensor, alpha: float) -> torch.Tensor:
+        """One-pole IIR low-pass filter along time dimension (T x Q)."""
+        a = float(alpha)
+        if not (a > 0.0):
+            return xx
+        if a >= 1.0:
+            a = 0.999
+
+        yy = xx.clone()
+        for t in range(1, yy.shape[0]):
+            yy[t] = a * yy[t - 1] + (1.0 - a) * xx[t]
+        return yy
 
     # ------------------ init helpers ------------------
     def _init_cpu_dq_model(self) -> None:
         # Targets
-        self.cpu_desire_abs_pose = vec8(DQ(self.desire_abs_pose).normalize())
-        self.cpu_desire_rel_pose = vec8(DQ(self.desire_rel_pose).normalize())
+        self.cpu_desire_abs_pose = DQ(self.desire_abs_pose)
+        self.cpu_desire_abs_pose = self.cpu_desire_abs_pose.normalize()
+        self.cpu_desire_abs_pose = vec8(self.cpu_desire_abs_pose)
+        self.cpu_desire_rel_pose = DQ(self.desire_rel_pose)
+        self.cpu_desire_rel_pose = self.cpu_desire_rel_pose.normalize()
+        self.cpu_desire_rel_pose = vec8(self.cpu_desire_rel_pose)
         self.cpu_desire_line_d = DQ(self.desire_line_d)
         self.cpu_desire_quat_line_ref = DQ(self.desire_quat_line_ref)
-
-        # Robot 1
-        robot1_dh = np.array(self.robot1_dh_mat).T
-        self.cpu_robot1_base = DQ(self.robot1_base).normalize()
-        self.cpu_robot1_effector = DQ(self.robot1_effector).normalize()
-        self.cpu_robot1 = (
-            DQ_SerialManipulatorMDH(robot1_dh)
-            if self.robot1_dh_type == 1
-            else DQ_SerialManipulatorDH(robot1_dh)
-        )
+        
+        # robot1
+        robot1_config_dh_mat = np.array(self.robot1_dh_mat)
+        self.cpu_robot1_dh_mat =  robot1_config_dh_mat.T
+        self.cpu_robot1_base = DQ(self.robot1_base)
+        self.cpu_robot1_base = self.cpu_robot1_base.normalize() 
+        self.cpu_robot1_effector = DQ(self.robot1_effector)
+        self.cpu_robot1_effector = self.cpu_robot1_effector.normalize()
+        if self.robot1_dh_type == 1:
+            self.cpu_robot1 = DQ_SerialManipulatorMDH(self.cpu_robot1_dh_mat)
+        else:
+            self.cpu_robot1 = DQ_SerialManipulatorDH(self.cpu_robot1_dh_mat)
         self.cpu_robot1.set_base_frame(self.cpu_robot1_base)
         self.cpu_robot1.set_reference_frame(self.cpu_robot1_base)
         self.cpu_robot1.set_effector(self.cpu_robot1_effector)
-
-        # Robot 2
-        robot2_dh = np.array(self.robot2_dh_mat).T
-        self.cpu_robot2_base = DQ(self.robot2_base).normalize()
-        self.cpu_robot2_effector = DQ(self.robot2_effector).normalize()
-        self.cpu_robot2 = (
-            DQ_SerialManipulatorMDH(robot2_dh)
-            if self.robot2_dh_type == 1
-            else DQ_SerialManipulatorDH(robot2_dh)
-        )
+        # robot2
+        robot2_config_dh_mat = np.array(self.robot2_dh_mat)
+        self.cpu_robot2_dh_mat =  robot2_config_dh_mat.T
+        self.cpu_robot2_base = DQ(self.robot2_base)
+        self.cpu_robot2_base = self.cpu_robot2_base.normalize()
+        self.cpu_robot2_effector = DQ(self.robot2_effector)
+        self.cpu_robot2_effector = self.cpu_robot2_effector.normalize()
+        if self.robot2_dh_type == 1:
+            self.cpu_robot2 = DQ_SerialManipulatorMDH(self.cpu_robot2_dh_mat)
+        else:
+            self.cpu_robot2 = DQ_SerialManipulatorDH(self.cpu_robot2_dh_mat)
         self.cpu_robot2.set_base_frame(self.cpu_robot2_base)
         self.cpu_robot2.set_reference_frame(self.cpu_robot2_base)
         self.cpu_robot2.set_effector(self.cpu_robot2_effector)
-
-        # Dual-arm coop model
-        self.cpu_dual = DQ_CooperativeDualTaskSpace(self.cpu_robot1, self.cpu_robot2)
+        # robot2 and robot1
+        self.cpu_dq_dual_arm_model = DQ_CooperativeDualTaskSpace(self.cpu_robot1, self.cpu_robot2)
 
     def _init_tensors(self) -> None:
         dev, dt = self.device, self.dtype
@@ -300,31 +341,50 @@ class CEMModule:
         d_new[d_new != 0] = weight  # why: convert any activation into fixed penalty
         return d_new.view(d_new.size(0), 1)
 
-    def cem_worker(self) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Run CEM planning and return (plan_seq [T,total_q], min_energy)."""
+    def cem_worker(
+        self, capture_variance: bool = False
+    ) -> Union[Tuple[torch.Tensor, torch.Tensor], Tuple[torch.Tensor, torch.Tensor, List[Dict[str, object]]]]:
+        """Run CEM planning and optionally capture per-iteration std statistics."""
         dev, dt = self.device, self.dtype
         torch.manual_seed(int(self.seed))
+
+        # Important: each CEM iteration must rollout from the same *current* state.
+        start_b_r1_q = self.b_r1_q.clone()
+        start_b_r2_q = self.b_r2_q.clone()
 
         elite_k = max(1, int(self.cem_elite_frac * self.batch_size))
         total_q = self.total_q
 
-        # Build a reference sequence for smoothness around last plan
+        # Reference sequence: last velocity plan (used as rollout nominal + smoothness reference)
         batch_last_seq = self.last_action_mean.repeat(self.batch_size, 1, 1)
+
+        # In this CEM variant we optimize in acceleration-space (actually Δdq = ddq * dt), like MPPI.
+        # We sample eps sequences and add them to the last velocity plan to obtain dq for rollouts.
+        eps_min = (torch.cat((self.g_r1_ddq_min, self.g_r2_ddq_min)) * float(self.dt)).view(1, 1, -1)
+        eps_max = (torch.cat((self.g_r1_ddq_max, self.g_r2_ddq_max)) * float(self.dt)).view(1, 1, -1)
+        if float(self.max_acc_abs_value) > 0.0:
+            abs_bound = torch.full((1, 1, total_q), float(self.dt) * float(self.max_acc_abs_value), device=dev, dtype=dt)
+            eps_min = torch.maximum(eps_min, -abs_bound)
+            eps_max = torch.minimum(eps_max, abs_bound)
 
         # CEM iterations
         plan_mean = self.action_mean.clone()
         plan_std = self.action_std.clone()
         min_energy = None
 
-        for _ in range(self.cem_iters):
-            # Sample sequences: [B, T, Q]
+        variance_history: Optional[List[Dict[str, object]]] = [] if capture_variance else None
+
+        for iter_idx in range(self.cem_iters):
+            # Sample eps (Δdq) sequences: [B, T, Q]
             seqs = torch.randn(self.batch_size, self.T, total_q, device=dev, dtype=dt) * plan_std + plan_mean
 
-            # Clamp by dq limits and ddq bounds relative to last plan
-            seqs = torch.max(seqs, torch.cat((self.g_r1_dq_min, self.g_r2_dq_min)).view(1, 1, -1))
-            seqs = torch.min(seqs, torch.cat((self.g_r1_dq_max, self.g_r2_dq_max)).view(1, 1, -1))
+            # Clamp eps by acceleration bounds (ddq*dt) and optional absolute bound
+            seqs = torch.max(seqs, eps_min)
+            seqs = torch.min(seqs, eps_max)
 
-            # Reset rollout state
+            # Reset rollout state (per-iteration)
+            self.b_r1_q = start_b_r1_q.clone()
+            self.b_r2_q = start_b_r2_q.clone()
             self.last_b_r1_q = self.b_r1_q.clone()
             self.last_b_r2_q = self.b_r2_q.clone()
             self.first_b_r1_q = self.b_r1_q.clone()
@@ -339,10 +399,10 @@ class CEMModule:
                     _, b_abs_pose, b_rel_jac, b_abs_position, b_angle = rel_abs_pose_rel_jac(
                         self.g_r1_dh,
                         self.g_r2_dh,
-                        self.g_r1_base.repeat(self.batch_size, 1),
-                        self.g_r2_base.repeat(self.batch_size, 1),
-                        self.g_r1_eff.repeat(self.batch_size, 1),
-                        self.g_r2_eff.repeat(self.batch_size, 1),
+                        self.b_r1_base,
+                        self.b_r2_base,
+                        self.b_r1_eff,
+                        self.b_r2_eff,
                         self.b_r1_q,
                         self.b_r2_q,
                         self.b_line_d,
@@ -355,9 +415,10 @@ class CEMModule:
                     b_null = get_rel_jacobian_null(b_rel_jac, self.robot1_q_num, self.robot2_q_num, self.batch_size)
 
                 # Current joint-velocity command from the sample
-                curr = seqs[:, i, :]
-                b_r1_dq = curr[:, : self.robot1_q_num]
-                b_r2_dq = curr[:, self.robot1_q_num :]
+                curr_eps = seqs[:, i, :]
+                curr_dq = batch_last_seq[:, i, :] + curr_eps
+                b_r1_dq = curr_dq[:, : self.robot1_q_num]
+                b_r2_dq = curr_dq[:, self.robot1_q_num :]
 
                 # Project into relative-task nullspace
                 b_r1_proj, b_r2_proj = get_proj_qd(
@@ -387,10 +448,10 @@ class CEMModule:
                 _, b_abs_pose, b_rel_jac, b_abs_position, b_angle = rel_abs_pose_rel_jac(
                     self.g_r1_dh,
                     self.g_r2_dh,
-                    self.g_r1_base.repeat(self.batch_size, 1),
-                    self.g_r2_base.repeat(self.batch_size, 1),
-                    self.g_r1_eff.repeat(self.batch_size, 1),
-                    self.g_r2_eff.repeat(self.batch_size, 1),
+                    self.b_r1_base,
+                    self.b_r2_base,
+                    self.b_r1_eff,
+                    self.b_r2_eff,
                     self.b_r1_q,
                     self.b_r2_q,
                     self.b_line_d,
@@ -427,7 +488,11 @@ class CEMModule:
             joint_change = torch.clamp(joint_change, min=0.001)
 
             term_abs_cost = get_abs_cost(self.b_abs_pose, b_abs_pose, self.b_abs_pos, b_abs_position, self.terminal_abs_weight, self.terminal_abs_position_weight)
-            stage_cost += term_abs_cost + term_abs_cost / (self.stagnation_weight * joint_change)
+            # Only add the terminal/stagnation ratio term on the first CEM iteration.
+            # (Matches MPPIKmeansAdpAnModule behavior for the first planning refinement; later CEM iters don't need it.)
+            stage_cost += term_abs_cost
+            if iter_idx == 0:
+                stage_cost += term_abs_cost / (self.stagnation_weight * joint_change)
 
             # Elite selection
             flat = stage_cost.squeeze(-1)
@@ -437,45 +502,178 @@ class CEMModule:
             # Update distribution with smoothing
             new_mean = elites.mean(dim=0)
             new_std = elites.std(dim=0, unbiased=False).clamp_min(1e-6)
-            plan_mean = (1.0 - self.cem_alpha) * plan_mean + self.cem_alpha * new_mean
+            plan_mean = new_mean
             plan_std = (1.0 - self.cem_alpha) * plan_std + self.cem_alpha * new_std
+
+            if capture_variance:
+                step_mean_std = plan_std.mean(dim=1).detach().cpu().tolist()
+                variance_history.append(
+                    {
+                        "iteration": int(iter_idx),
+                        "mean_std": float(plan_std.mean().detach().item()),
+                        "min_std": float(plan_std.min().detach().item()),
+                        "max_std": float(plan_std.max().detach().item()),
+                        "step_mean_std": step_mean_std,
+                    }
+                )
 
             # Track min energy
             cur_min = best_vals.min()
             min_energy = cur_min if min_energy is None else torch.minimum(min_energy, cur_min)
 
         # Save plan and apply relative-task guidance
-        self.current_plan = plan_mean.clamp(
+        # Convert optimized eps-mean (Δdq) into a velocity plan by adding to last velocity plan
+        self.current_plan = (self.last_action_mean + plan_mean).clamp(
             torch.cat((self.g_r1_dq_min, self.g_r2_dq_min)),
             torch.cat((self.g_r1_dq_max, self.g_r2_dq_max)),
         )
+
+        # Smooth planned sequence (match MPPI: moving average on the planned sequence)
         self.current_mppi_result = self.current_plan.clone()  # reuse downstream method name
+        self.current_mppi_result = self.moving_average_filter(self.current_mppi_result, int(self.T))
+        self.current_mppi_result = self.current_mppi_result.clamp(
+            torch.cat((self.g_r1_dq_min, self.g_r2_dq_min)),
+            torch.cat((self.g_r1_dq_max, self.g_r2_dq_max)),
+        )
         self._apply_relative_guidance()
 
         # Receding horizon: remember & shift
         self.last_action_mean = self.current_mppi_result.clone()
-        self.action_mean[:-1, :] = self.current_mppi_result[1:, :]
+        # Keep distribution warm-start in eps-space
+        self.action_mean[:-1, :] = plan_mean[1:, :]
         self.action_mean[-1, :].zero_()
         self.action_std *= self.decay
 
-        return self.current_mppi_result, min_energy if min_energy is not None else torch.tensor(0.0, device=dev)
+        min_energy = min_energy if min_energy is not None else torch.tensor(0.0, device=dev)
+        if capture_variance:
+            return self.current_mppi_result, min_energy, variance_history if variance_history is not None else []
+        return self.current_mppi_result, min_energy
 
     def warm_up(self) -> None:
-        # why: fill distribution with feasible stats before control loop
-        for _ in range(5):
+        # Match MPPIAdpAnModule warm-up: update switch state, then reset planner state.
+        for _ in range(10):
             self.update_joint_states()
-            self.cem_worker()
+            _, cem_energy = self.cem_worker()
+            _, p_energy = self.traditional_control_result()
+            self.update_c(cem_energy, p_energy)
+
+        # action_mean is eps(Δdq) mean; last_action_mean is the last velocity plan
+        self.action_mean.zero_()
+        self.last_action_mean.zero_()
+        self.current_plan.zero_()
+        self.current_mppi_result = torch.zeros_like(self.action_mean)
+        self.action_std.fill_(float(self.init_std))
+        self.c = 0.0
+        self.start_time = time.time()
 
     def warm_up2(self) -> None:
-        for _ in range(3):
+        for _ in range(10):
             self.update_joint_states()
-            self.cem_worker()
+            _, cem_energy = self.cem_worker()
+            _, p_energy = self.traditional_control_result()
+            self.update_c(cem_energy, p_energy)
+
+        self.c = 0.0
+        self.start_time = time.time()
 
     def play_once(self) -> None:
         self.update_joint_states()
-        plan, _ = self.cem_worker()
-        u0 = plan[0].detach().cpu().numpy().tolist()
-        self.ros_module.write_high_u(u0)
+        plan, cem_energy = self.cem_worker()
+        p_u0, p_energy = self.traditional_control_result()
+
+        try:
+            cem_energy_v = float(cem_energy.detach().item()) if isinstance(cem_energy, torch.Tensor) else float(cem_energy)
+        except Exception:
+            cem_energy_v = float("nan")
+        try:
+            p_energy_v = float(p_energy.detach().item()) if isinstance(p_energy, torch.Tensor) else float(p_energy)
+        except Exception:
+            p_energy_v = float("nan")
+
+        u0_cem = plan[0].detach().cpu().numpy()
+        flag = self.update_c(cem_energy, p_energy)
+
+        print("cem_energy:", cem_energy_v)
+        print("p_energy:", p_energy_v)
+        print("c:", float(self.c), "switch_to_traditional:", bool(flag))
+        if flag:
+            u0 = p_u0
+            # Reset planner state when falling back, like MPPIAdpAnModule
+            # action_mean is eps(Δdq) mean; last_action_mean is the last velocity plan
+            self.action_mean.zero_()
+            self.last_action_mean.zero_()
+            self.current_plan.zero_()
+            self.current_mppi_result = torch.zeros_like(self.action_mean)
+            self.action_std.fill_(float(self.init_std))
+        else:
+            u0 = u0_cem
+
+        self.ros_module.write_high_u(u0.tolist())
+
+    def update_c(self, cem_energy: Union[torch.Tensor, float], p_energy: Union[torch.Tensor, float]) -> bool:
+        """Return True when switching to traditional controller is triggered."""
+        if isinstance(cem_energy, torch.Tensor):
+            cem_energy_v = float(cem_energy.detach().item())
+        else:
+            cem_energy_v = float(cem_energy)
+        if isinstance(p_energy, torch.Tensor):
+            p_energy_v = float(p_energy.detach().item())
+        else:
+            p_energy_v = float(p_energy)
+
+        cem_energy_v = max(cem_energy_v, 1e-12)
+        c_add = float(self.dt) * (p_energy_v / cem_energy_v - float(self.c_eta))
+        self.c += c_add
+        self.c = max(-0.05, min(float(self.c_abs_max), float(self.c)))
+        return self.c < 0.0
+
+    def traditional_control_result(self):
+        dual_arm_joint_pos = np.concatenate((self.robot1_q, self.robot2_q))
+        energy = 0
+        for i in range(self.T):
+            dual_arm_abs_feedback = vec8(self.cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos))
+            dual_arm_rel_feedback = vec8(self.cpu_dq_dual_arm_model.relative_pose(dual_arm_joint_pos))
+            dual_arm_rel_error = self.cpu_desire_rel_pose - dual_arm_rel_feedback
+            dual_arm_abs_error = self.cpu_desire_abs_pose - dual_arm_abs_feedback
+            dual_arm_rel_jacobian = self.cpu_dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
+            dual_arm_rel_jacobian_roboust_inv = dual_arm_rel_jacobian.T @ np.linalg.pinv(np.matmul(dual_arm_rel_jacobian, dual_arm_rel_jacobian.T) + 0.0000001 * np.eye(8))
+            # abs control
+            dual_arm_abs_jacobian = self.cpu_dq_dual_arm_model.absolute_pose_jacobian(dual_arm_joint_pos)
+            dual_arm_abs_feedback = vec8(self.cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos))
+            dual_arm_abs_refer = vec8(DQ(self.desire_abs_pose).normalize())
+            dual_arm_abs_error = dual_arm_abs_refer - dual_arm_abs_feedback
+            dual_arm_abs_jacobian_roboust_inv = dual_arm_abs_jacobian.T @ np.linalg.pinv(np.matmul(dual_arm_abs_jacobian, dual_arm_abs_jacobian.T) + 0.0000001 * np.eye(8))
+            dual_arm_abs_joint_vel = self.high_abs_gain * np.matmul(dual_arm_abs_jacobian_roboust_inv, (dual_arm_abs_error))
+            # null space control
+            dual_arm_joint_vel = np.matmul(np.eye(self.robot1_q_num+self.robot2_q_num)-dual_arm_rel_jacobian_roboust_inv@(dual_arm_rel_jacobian), dual_arm_abs_joint_vel)
+            dual_arm_joint_vel = np.clip(dual_arm_joint_vel, -0.3, 0.3)           
+            if i == 0:
+                dual_arm_return = dual_arm_joint_vel 
+            dual_arm_joint_pos +=  self.dt * dual_arm_joint_vel
+            dual_arm_abs_feedback = self.cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos)
+            abs_cost = self.abs_weight* np.linalg.norm(dual_arm_abs_refer - vec8(dual_arm_abs_feedback))
+            abs_pose_p = dual_arm_abs_feedback.P()
+            abs_pose_d = dual_arm_abs_feedback.D()
+            abs_position = (2*abs_pose_d*abs_pose_p.conj())
+            current_l_quat = abs_pose_p*self.cpu_desire_line_d*abs_pose_p.conj()
+            current_l_quat = current_l_quat.normalize()
+            self.cpu_desire_quat_line_ref = self.cpu_desire_quat_line_ref.normalize()
+            angle = 57.2958*math.acos(vec4(current_l_quat).dot(vec4(self.cpu_desire_quat_line_ref)))
+            if abs(angle) > self.max_abs_tilt_angle:
+                tilt_cost = 1*self.tilt_constraint_weight
+            else:
+                tilt_cost = 0
+            desire_abs_position = [0,self.desire_abs_position[0],self.desire_abs_position[1],self.desire_abs_position[2]]
+            abs_position_cost = self.abs_position_weight * np.linalg.norm(desire_abs_position - vec4(abs_position))
+            dual_arm_joint_pos_cuda = torch.from_numpy(dual_arm_joint_pos).view(1, (self.robot1_q_num+self.robot2_q_num)).cuda().float()
+            d_world, d_self = self.curobo_fn2.get_world_self_collision_distance_from_joints(dual_arm_joint_pos_cuda)
+            d_new = d_world + d_self
+            d_new[d_new!=0] = self.collision_constraint_weight
+            energy += abs_cost + abs_position_cost + d_new + tilt_cost
+        terminal_abs_cost = self.terminal_abs_weight * np.linalg.norm(dual_arm_abs_refer - vec8(dual_arm_abs_feedback))
+        terminal_abs_position_cost = self.terminal_abs_position_weight * np.linalg.norm(desire_abs_position - vec4(abs_position))
+        energy += terminal_abs_cost + terminal_abs_position_cost +tilt_cost
+        return  dual_arm_return, energy
 
     # ------------------ guidance (CPU DQ) ------------------
     def _apply_relative_guidance(self) -> None:
@@ -483,9 +681,9 @@ class CEMModule:
         dual_q = np.concatenate((self.robot1_q, self.robot2_q))
         for i in range(self.T):
             # Relative-task feedback
-            rel_fb = vec8(self.cpu_dual.relative_pose(dual_q))
+            rel_fb = vec8(self.cpu_dq_dual_arm_model.relative_pose(dual_q))
             rel_err = self.cpu_desire_rel_pose - rel_fb
-            Jrel = self.cpu_dual.relative_pose_jacobian(dual_q)
+            Jrel = self.cpu_dq_dual_arm_model.relative_pose_jacobian(dual_q)
             Jrel_pinv = Jrel.T @ np.linalg.pinv(Jrel @ Jrel.T + 1e-7 * np.eye(8))
             v_rel = self.high_rel_gain * (Jrel_pinv @ rel_err)
 

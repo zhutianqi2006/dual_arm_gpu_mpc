@@ -40,9 +40,9 @@ mppi_T: 20
 mppi_seed: 0
 batch_size: 1000
 mean: 0.0
-std: 3.0
+std: 1.732050808
 gamma: 0.5
-an_std: 1.0
+an_std: 0.774596669
 log_std: 0.1
 num_clusters: 3
 common_num: 1

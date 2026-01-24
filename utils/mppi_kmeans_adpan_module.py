@@ -17,6 +17,12 @@ from dqrobotics.robot_modeling import DQ_SerialManipulatorDH, DQ_SerialManipulat
 from dq_torch import rel_abs_pose_rel_jac, dq_inv ,dq_mult ,rotation_angle, dq_translation
 from utils.config_module import ConfigModule
 from utils.high_ros_module import HighROSModule
+from utils.dq_manipulability import (
+    dq_jacobian_to_twist_jacobian,
+    manipulability_from_twist_jacobian_rows,
+    manipulability_from_twist_jacobian_rows_pdet,
+    manipulability_from_twist_jacobian_rows_gram_eig_scaled,
+)
 from kmeans_pytorch import kmeans
 # 
 import rclpy
@@ -57,6 +63,28 @@ class MPPIKmeansAdpAnModule():
         self.terminal_abs_position_weight = config.terminal_abs_position_weight
         self.q_acc_weight = config.q_acc_weight
         self.q_vel_weight = config.q_vel_weight
+        self.manip_weight = getattr(config, "manip_weight", 0.5)
+
+        # manipulability options (all optional, keep backward compatible)
+        self.manip_enable = getattr(config, "manip_enable", self.manip_weight > 0.0)
+        self.manip_metric = getattr(config, "manip_metric", "pdet")
+        self.manip_twist_rows = getattr(config, "manip_twist_rows", "all6")
+        self.manip_pdet_k = getattr(config, "manip_pdet_k", None)
+        self.manip_gram_eig_last3_div = float(getattr(config, "manip_gram_eig_last3_div", 1.0))
+        self.manip_gram_eig_last_k = int(getattr(config, "manip_gram_eig_last_k", 3))
+        self.manip_eps = float(getattr(config, "manip_eps", 1e-12))
+
+        # manipulability logging (optional)
+        self.manip_log_enable = bool(getattr(config, "manip_log_enable", False))
+        self.manip_log_flush_every = int(getattr(config, "manip_log_flush_every", 50))
+        self.manip_log_path = getattr(config, "manip_log_path", None)
+        self._manip_log_steps: list[int] = []
+        self._manip_log_t: list[float] = []
+        self._manip_log_manip: list[float] = []
+        self._manip_log_calls = 0
+        if self.manip_log_enable:
+            self._init_manip_logger()
+
         self.num_clusters = config.num_clusters
         self.common_num = config.common_num
         # robot 1 
@@ -107,6 +135,110 @@ class MPPIKmeansAdpAnModule():
         self.ros_module = HighROSModule(config)
         self.ros_thread = threading.Thread(target=self.ros_module.run)
         self.ros_thread.start()
+
+    def _init_manip_logger(self):
+        repo_root = os.path.dirname(os.path.dirname(__file__))
+        logs_dir = os.path.join(repo_root, "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+
+        if self.manip_log_path is None or str(self.manip_log_path).strip() == "":
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            self.manip_log_path = os.path.join(logs_dir, f"manip_trace_{ts}.npz")
+
+    def _append_current_manip_log(self, t: float, manip_value: float):
+        if not self.manip_log_enable:
+            return
+
+        self._manip_log_calls += 1
+        self._manip_log_steps.append(int(self._manip_log_calls))
+        self._manip_log_t.append(float(t))
+        self._manip_log_manip.append(float(manip_value))
+
+        if self.manip_log_flush_every > 0 and (self._manip_log_calls % self.manip_log_flush_every) == 0:
+            self._flush_manip_log()
+
+    def _flush_manip_log(self):
+        if not self.manip_log_enable:
+            return
+        if self.manip_log_path is None:
+            return
+        if len(self._manip_log_steps) == 0:
+            return
+
+        np.savez(
+            self.manip_log_path,
+            step=np.asarray(self._manip_log_steps, dtype=np.int64),
+            t=np.asarray(self._manip_log_t, dtype=np.float64),
+            manipulability=np.asarray(self._manip_log_manip, dtype=np.float64),
+            metric=str(self.manip_metric),
+            rows=str(self.manip_twist_rows),
+            pdet_k=(-1 if self.manip_pdet_k is None else int(self.manip_pdet_k)),
+            gram_eig_last_k=int(self.manip_gram_eig_last_k),
+            gram_eig_last3_div=float(self.manip_gram_eig_last3_div),
+            weight=float(self.manip_weight),
+        )
+
+    def flush_manip_log(self):
+        """Manually flush manipulability log to disk (npz)."""
+        self._flush_manip_log()
+
+    def _compute_manip_from_twist_jacobian(self, j_twist: torch.Tensor) -> torch.Tensor:
+        """Return manipulability (..., 1) from a 6xN twist Jacobian per current config."""
+        metric = str(self.manip_metric).lower()
+        rows = str(self.manip_twist_rows).lower()
+        eps = self.manip_eps
+
+        if metric in ("pdet", "svd", "pseudo_det", "pseudodet"):
+            k = None if self.manip_pdet_k is None else int(self.manip_pdet_k)
+            return manipulability_from_twist_jacobian_rows_pdet(j_twist, rows=rows, k=k, eps=eps)
+        if metric in ("gram_eig_scaled", "eig_scaled", "gram_eig"):
+            return manipulability_from_twist_jacobian_rows_gram_eig_scaled(
+                j_twist,
+                rows=rows,
+                last_k=int(self.manip_gram_eig_last_k),
+                div=float(self.manip_gram_eig_last3_div),
+                eps=eps,
+            )
+        if metric in ("yoshikawa", "det"):
+            return manipulability_from_twist_jacobian_rows(j_twist, rows=rows, eps=eps)
+
+        raise ValueError(
+            f"Unknown manip_metric={self.manip_metric!r} (expected 'pdet', 'gram_eig_scaled', or 'yoshikawa')"
+        )
+
+    def _log_current_manipulability(self):
+        """Log manipulability at the current real joint state (batch=1)."""
+        if not self.manip_log_enable:
+            return
+
+        # time base: prefer controller start_time if warm_up was called
+        now = time.time()
+        t = float(now - self.start_time) if hasattr(self, "start_time") else float(now)
+
+        q1 = torch.tensor(self.robot1_q, device=self.device, dtype=self.dtype).view(1, -1)
+        q2 = torch.tensor(self.robot2_q, device=self.device, dtype=self.dtype).view(1, -1)
+
+        rel_pos, _, rel_jac, _, _ = rel_abs_pose_rel_jac(
+            self.gpu_robot1_dh_mat,
+            self.gpu_robot2_dh_mat,
+            self.batch_robot1_base[:1],
+            self.batch_robot2_base[:1],
+            self.batch_robot1_effector[:1],
+            self.batch_robot2_effector[:1],
+            q1,
+            q2,
+            self.batch_line_d[:1],
+            self.batch_quat_line_ref[:1],
+            self.robot1_q_num,
+            self.robot2_q_num,
+            self.robot1_dh_type,
+            self.robot2_dh_type,
+        )
+
+        j_twist = dq_jacobian_to_twist_jacobian(rel_pos, rel_jac)  # (1, 6, N)
+        manip = self._compute_manip_from_twist_jacobian(j_twist)  # (1, 1)
+        manip_value = float(manip.detach().to(torch.float64).view(-1)[0].item())
+        self._append_current_manip_log(t=t, manip_value=manip_value)
 
     def init_cpu_dq_model(self):
         self.cpu_desire_abs_pose = DQ(self.desire_abs_pose)
@@ -361,7 +493,7 @@ class MPPIKmeansAdpAnModule():
         min_energy = self.stage_cost.min()
         min_index = self.stage_cost.argmin()
         cluster_ids_x, cluster_centers = kmeans(
-            X=combined_tensor, num_clusters=num_clusters, distance='euclidean', device=torch.device('cuda:0'), tol=1e-3)
+            X=combined_tensor, num_clusters=num_clusters, distance='euclidean', device=torch.device('cuda:0'), tol=1e-4)
         stage_cost = self.stage_cost.squeeze()  # 转换为1D张量
         _, indices = torch.topk(stage_cost, k=self.common_num, largest=False)
         indices = indices.cpu()  
@@ -461,6 +593,9 @@ class MPPIKmeansAdpAnModule():
             self.stage_cost += (abs_cost + vel_cost+ collision_cost + acc_cost + tilt_constraint_cost)
         joint_change = torch.square(self.first_batch_fake_robot1_q-self.batch_fake_robot1_q).sum(dim=1, keepdim=True)+torch.square(self.first_batch_fake_robot2_q-self.batch_fake_robot2_q).sum(dim=1, keepdim=True)
         abs_terminal_cost = get_abs_cost(self.batch_desire_abs_pose, bacth_abs_pos, self.batch_desire_abs_position, batch_abs_position, self.terminal_abs_weight, self.terminal_abs_position_weight)
+        if self.manip_enable:
+            manip_cost = self._terminal_manip_cost(rel_pos, bacth_rel_jacobian)
+            self.stage_cost += manip_cost
         self.stage_cost += abs_terminal_cost + 0.01*joint_change
         min_energy = self.stage_cost.min()
         epsilon = get_all_dq_seq(robot1_acc_explore_seq, robot2_acc_explore_seq)
@@ -473,6 +608,18 @@ class MPPIKmeansAdpAnModule():
         self.last_mppi_result[:-1,:] = self.current_mppi_result[1:,:]
         self.last_mppi_result[-1,:] = self.current_mppi_result[-1,:]
         return self.current_mppi_result, min_energy
+
+    def _terminal_manip_cost(self, rel_pose_vec8: torch.Tensor, rel_jacobian: torch.Tensor) -> torch.Tensor:
+        """Penalize low manipulability at the final rollout state.
+
+        Uses a 6xN twist Jacobian derived from the DQ pose Jacobian.
+        """
+        # rel_pose_vec8: (B, 8), rel_jacobian: (B, 8, N)
+        j_twist = dq_jacobian_to_twist_jacobian(rel_pose_vec8, rel_jacobian)  # (B, 6, N)
+
+        eps = self.manip_eps
+        manip = self._compute_manip_from_twist_jacobian(j_twist)
+        return float(self.manip_weight) / torch.clamp(manip, min=eps)
     
     def traditional_control_result(self):
         dual_arm_joint_pos = np.concatenate((self.robot1_q, self.robot2_q))
@@ -613,6 +760,8 @@ class MPPIKmeansAdpAnModule():
 
     def play_once(self):
         self.update_joint_states()
+        if self.manip_log_enable:
+            self._log_current_manipulability()
         _, mppi_energy = self.mppi_worker()
         mppi_u, _ = self.mppi_worker2()
         p_u0, p_energy = self.traditional_control_result()
@@ -629,6 +778,8 @@ class MPPIKmeansAdpAnModule():
             u0 =mppi_u0
         u0 = u0.tolist()
         self.ros_module.write_high_u(u0)
+        if self.manip_log_enable and self.manip_log_flush_every <= 0:
+            self._flush_manip_log()
 
 # batch_robot_q size is batch_size x joint_num
 # batch_robot_dq size is batch_size x joint_num

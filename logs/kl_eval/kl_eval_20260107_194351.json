@@ -1,0 +1,30 @@
+{
+  "3.0": {
+    "traj_mean_norm": 0.3550448715686798,
+    "traj_samples": 3000,
+    "cost_mean": 14637.1279296875,
+    "cost_std": 18405.5390625,
+    "step0_base_mean": 500.0,
+    "step0_penalty_mean": 7637.12890625,
+    "stage_cost_base_var": 112500000.0,
+    "stage_cost_penalty_var": 338763904.0,
+    "ratio_term_var": 75769696.0,
+    "kl_cost_base_to_penalty": 7.629061068519191,
+    "kl_cost_penalty_to_base": 11.125018143260682
+  },
+  "0.6": {
+    "traj_mean_norm": 0.352595716714859,
+    "traj_samples": 3000,
+    "cost_mean": 2131.82177734375,
+    "cost_std": 1098.2125244140625,
+    "step0_base_mean": 0.0,
+    "step0_penalty_mean": 2131.82177734375,
+    "stage_cost_base_var": 0.0,
+    "stage_cost_penalty_var": 1206070.875,
+    "ratio_term_var": 1207412.625,
+    "kl_cost_base_to_penalty": NaN,
+    "kl_cost_penalty_to_base": NaN
+  },
+  "kl_traj_3.0_to_0.6": 6883.409261006276,
+  "kl_cost_3.0_to_0.6": 2.8650655167297425
+}

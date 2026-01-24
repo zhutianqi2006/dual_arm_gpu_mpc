@@ -523,20 +523,20 @@ class CrocoddylDDPVFIModule:
 
         # 代价权重（默认绝对旋转更重，平移在速度整形项里处理）
         w_abs_rot = float(getattr(config, "ddp_w_abs_rot", 5e2))
-        w_abs_trans = float(getattr(config, "ddp_w_abs_trans", 0.0))
+        w_abs_trans = float(getattr(config, "ddp_w_abs_trans", 5e2))
         self.w_abs_vec = np.array([w_abs_rot, w_abs_rot, w_abs_rot, w_abs_rot, w_abs_trans, w_abs_trans, w_abs_trans, w_abs_trans], dtype=float)
         mpc_weights = {
             "w_rel": np.zeros(8),        # 相对位姿由等式冻结
             "w_abs": self.w_abs_vec,
-            "w_vabs": np.zeros(8),      # 速度整形默认关闭（必要时可打开）
+            "w_vabs": 5,      # 速度整形默认关闭（必要时可打开）
             "beta_abs": 0.0,
-            "w_u": 0.0,
+            "w_u": 10,
         }
         self.mpc = CrocoMPC(self.kino, dt=self.ddp_dt, N=self.ddp_N, weights=mpc_weights)
 
         # 投影器
         self.eq = EqualityProjector(reg=1e-8)
-        self.vfi = VFIProjector(self.kino, obstacles, gamma=float(getattr(config, "vfi_gamma", 8.0)), activate_margin=float(getattr(config, "vfi_activate_margin", 0.10)), max_iters=int(getattr(config, "vfi_max_iters", 25)))
+        self.vfi = VFIProjector(self.kino, obstacles, gamma=float(getattr(config, "vfi_gamma", 4.0)), activate_margin=float(getattr(config, "vfi_activate_margin", 0.10)), max_iters=int(getattr(config, "vfi_max_iters", 25)))
 
         # 状态缓存（来自 ROS）
         self.robot1_q = np.zeros(self.robot1_q_num)

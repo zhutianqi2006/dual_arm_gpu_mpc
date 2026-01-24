@@ -15,6 +15,7 @@ import rclpy.logging
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
+from geometry_msgs.msg import PointStamped   # ← 新增
 import numpy as np
 
 from utils.config_module import ConfigModule
@@ -74,11 +75,12 @@ class HighROSModule(Node):
             self.obstacle_topic,
             1)
         # init obstacle subscriber
+        self.world_object_topic = "/dock_position_world"
         self.obstacle_sub = self.create_subscription(
-            Float64MultiArray,
-            "/object_relative_position",
-            self.obstacle_callback,
-            0)
+            PointStamped,                      # ← 消息类型改为 PointStamped
+            self.world_object_topic,           # ← 话题改为 /dock_position_world
+            self.obstacle_callback,            # ← 回调仍叫这个名，但签名变了
+            10)
         
     def write_high_u(self, mppi_u0):
         for i in range(self.robot1_q_num+self.robot2_q_num):
@@ -98,8 +100,12 @@ class HighROSModule(Node):
         self.robot2_q = list(msg.position[:self.robot2_q_num])
         self.robot2_init_flag = True
 
-    def obstacle_callback(self, msg: Float64MultiArray):
-        self.dynamic_obstacle = list(msg.data[:3])
+    def obstacle_callback(self, msg: PointStamped):
+        # world frame 下的目标位置 (单位：米)
+        self.dynamic_obstacle = [float(msg.point.x),
+                                 float(msg.point.y),
+                                 float(msg.point.z)]
+        print(self.dynamic_obstacle)
 
     def run(self):
         rclpy.spin(self)

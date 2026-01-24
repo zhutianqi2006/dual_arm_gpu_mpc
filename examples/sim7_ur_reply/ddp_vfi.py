@@ -28,18 +28,16 @@ if __name__ == "__main__":
 
     # 可选：障碍（球）
     obstacles = [
-        {"center": np.array([0.5, 0.00, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.5, 0.06, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.5, -0.06, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.5, -0.06, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.5, -0.12, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.5, 0.12, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.45, 0.00, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.45, 0.06, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.45, -0.06, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.45, -0.06, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.45, -0.12, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.45, 0.12, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
+        {"center": np.array([0.5, 0.00, 0.25]), "radius": 0.04, "buffer": 0.01, "weight": 2e6, "color": [1, 0, 0, 0.35]},
+        {"center": np.array([0.5, 0.06, 0.25]), "radius": 0.04, "buffer": 0.01, "weight": 2e6, "color": [1, 0, 0, 0.35]},
+        {"center": np.array([0.5, -0.06, 0.25]), "radius": 0.04, "buffer": 0.01, "weight": 2e6, "color": [1, 0, 0, 0.35]},
+        {"center": np.array([0.5, -0.12, 0.25]), "radius": 0.04, "buffer": 0.01, "weight": 2e6, "color": [1, 0, 0, 0.35]},
+        {"center": np.array([0.5, 0.12, 0.25]), "radius": 0.04, "buffer": 0.01, "weight": 2e6, "color": [1, 0, 0, 0.35]},
+        {"center": np.array([0.45, 0.00, 0.25]), "radius": 0.04, "buffer": 0.01, "weight": 2e6, "color": [1, 0, 0, 0.35]},
+        {"center": np.array([0.45, 0.06, 0.25]), "radius": 0.04, "buffer": 0.01, "weight": 2e6, "color": [1, 0, 0, 0.35]},
+        {"center": np.array([0.45, -0.06, 0.25]), "radius": 0.04, "buffer": 0.01, "weight": 2e6, "color": [1, 0, 0, 0.35]},
+        {"center": np.array([0.45, -0.12, 0.25]), "radius": 0.04, "buffer": 0.01, "weight": 2e6, "color": [1, 0, 0, 0.35]},
+        {"center": np.array([0.45, 0.12, 0.25]), "radius": 0.04, "buffer": 0.01, "weight": 2e6, "color": [1, 0, 0, 0.35]},
     ]
 
     ctrl = CrocoddylDDPVFIModule(cfg, desire_abs_pose, desire_rel_pose, obstacles)

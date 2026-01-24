@@ -46,7 +46,7 @@ def _setup_pybullet():
     pyb.setTimeStep(1.0 / 60.0, physicsClientId=cid)
     pyb.setAdditionalSearchPath(pybullet_data.getDataPath(), physicsClientId=cid)
     ground_id = pyb.loadURDF('plane.urdf', [0, 0, 0], useFixedBase=True, physicsClientId=cid)
-    robot_id = pyb.loadURDF('model/dual_arm_model/dual_arm_notray_model.urdf', [0, 0, 0], useFixedBase=True, physicsClientId=cid)
+    robot_id = pyb.loadURDF('model/dual_arm_model/dual_arm_model.urdf', [0, 0, 0], useFixedBase=True, physicsClientId=cid)
     robot = pyb_utils.Robot(robot_id, client_id=cid)
     pyb.resetDebugVisualizerCamera(
         cameraDistance=CAM['distance'], cameraYaw=CAM['yaw'], cameraPitch=CAM['pitch'], cameraTargetPosition=CAM['target']

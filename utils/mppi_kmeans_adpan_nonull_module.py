@@ -352,7 +352,7 @@ class MPPIKmeansAdpAnModule():
         scaled_robot2_q_change =  (robot2_q_change - robot2_q_change_min) / (robot2_q_change_max - robot2_q_change_min)
 
         num_clusters =  self.num_clusters 
-        combined_tensor = torch.cat((scaled_stage_cost, scaled_robot1_q_change, scaled_robot2_q_change), dim=1)
+        combined_tensor = torch.cat((scaled_stage_cost/10.0, scaled_robot1_q_change, scaled_robot2_q_change), dim=1)
         # combined_tensor = torch.cat((scaled_stage_cost, 2*scaled_exp_cost), dim=1)
         # combined_tensor = scaled_exp_cost
         min_energy = self.stage_cost.min()
@@ -483,7 +483,7 @@ class MPPIKmeansAdpAnModule():
             all_jacobian = np.vstack((dual_arm_rel_jacobian, dual_arm_abs_jacobian))
             all_error = np.hstack((dual_arm_rel_error, dual_arm_abs_error))
             all_jacobian_pinv =np.linalg.pinv(all_jacobian)
-            dual_arm_joint_vel = self.high_abs_gain * np.matmul(all_jacobian_pinv, all_error)
+            dual_arm_joint_vel = self.high_abs_gain * np.matmul(all_jacobian_pinv, all_error)+np.linalg.pinv(dual_arm_rel_jacobian)@(dual_arm_rel_error)
             dual_arm_joint_vel = np.clip(dual_arm_joint_vel, -0.3, 0.3)           
             if i == 0:
                 dual_arm_return = dual_arm_joint_vel 

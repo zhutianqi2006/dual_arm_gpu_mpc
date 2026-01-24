@@ -86,7 +86,7 @@ class DualArmBulletModel(Node):
         )
         dual_arm_robot = pyb_utils.Robot(dual_arm_robot_id, client_id=client_id)
         # some cubes for obstacles
-        sphere_radius = 0.2
+        sphere_radius = 0.15
         sphere_collision_shape = pyb.createCollisionShape(
             pyb.GEOM_SPHERE, 
             radius=sphere_radius,

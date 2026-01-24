@@ -17,6 +17,15 @@ from dqrobotics.robot_modeling import DQ_SerialManipulatorDH, DQ_SerialManipulat
 from dq_torch import rel_abs_pose_rel_jac
 from utils.config_module import ConfigModule
 from utils.high_ros_module import HighROSModule
+from utils.dq_manipulability import (
+    dq_jacobian_to_twist_jacobian,
+    manipulability_cost_from_twist_jacobian_rows,
+    manipulability_from_twist_jacobian_rows,
+    manipulability_cost_from_twist_jacobian_rows_pdet,
+    manipulability_from_twist_jacobian_rows_pdet,
+    manipulability_cost_from_twist_jacobian_rows_gram_eig_scaled,
+    manipulability_from_twist_jacobian_rows_gram_eig_scaled,
+)
 # 
 import rclpy
 import array
@@ -39,9 +48,41 @@ class MPPILogStdModule():
         self.log_std = config.log_std
         self.batch_eps = 1e-8*torch.eye(8, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1, 1)
         self.param_lambda = 0.5
+        self.manip_weight = float(getattr(config, "manip_weight", 0.0))
+        self.manip_twist_rows = str(getattr(config, "manip_twist_rows", "all6"))
+        self.manip_metric = str(getattr(config, "manip_metric", "yoshikawa")).lower()
+        self.manip_pdet_k = getattr(config, "manip_pdet_k", None)
+        self.manip_gram_eig_last3_div = float(getattr(config, "manip_gram_eig_last3_div", 10.0))
+        if self.manip_pdet_k is not None:
+            try:
+                self.manip_pdet_k = int(self.manip_pdet_k)
+            except Exception:
+                self.manip_pdet_k = None
         self.max_acc_abs_value = config.max_acc_abs_value
         self.warm_up_flag = False
         self.max_abs_tilt_angle = config.max_abs_tilt_angle 
+
+        # manipulability logging (optional)
+        self.manip_log_path = None  # set to a .npz path to enable periodic saving
+        self.manip_log_flush_every = 200
+        self.manip_log_print_every = 0
+        self._manip_log_step = 0
+        self._manip_log_t0 = time.time()
+        self._manip_log_steps = []
+        self._manip_log_times = []
+        self._manip_log_manip = []
+
+        # debug printing
+        self.debug_print_rel_jacobian = False
+        self.debug_print_rel_jacobian_every = 1
+        self.debug_print_twist_jacobian = False
+        self.debug_print_twist_jacobian_every = 1
+        self.debug_print_twist_spectrum = False
+        self.debug_print_twist_spectrum_every = 1
+        self.debug_twist_gram_eig_last3_div = 1.0
+        self._debug_step = 0
+        self._last_rel_jacobian = None
+        self._last_rel_pose_vec8 = None
         # mppi weight
         self.collision_constraint_weight = config.collision_constraint_weight
         self.q_limit_constraint_weight = config.q_limit_constraint_weight
@@ -271,6 +312,9 @@ class MPPILogStdModule():
                                                      self.batch_robot1_effector, self.batch_robot2_effector, 
                                                      self.batch_fake_robot1_q, self.batch_fake_robot2_q,
                                                      self.batch_line_d, self.batch_quat_line_ref, self.robot1_q_num, self.robot2_q_num, self.robot1_dh_type, self.robot2_dh_type)
+                # cache for debug printing (use current state, before rollouts evolve)
+                self._last_rel_pose_vec8 = rel_pos.detach()
+                self._last_rel_jacobian = bacth_rel_jacobian.detach()
                 bacth_rel_jacobian_null =  get_rel_jacobian_null(bacth_rel_jacobian, self.robot1_q_num, self.robot2_q_num, self.batch_size)
 
             batch_robot1_ith_dq, batch_robot2_ith_dq = get_current_vel(batch_robot1_dq_seq, batch_robot2_dq_seq, i)
@@ -310,6 +354,8 @@ class MPPILogStdModule():
         min_joint_change = 0.001
         joint_change = torch.clamp(joint_change, min=min_joint_change)
         stagnation_cost = self.stagnation_weight*joint_change
+        manip_cost = self._terminal_manip_cost(rel_pos, bacth_rel_jacobian)
+        self.stage_cost += manip_cost
         abs_terminal_cost = get_abs_cost(self.batch_desire_abs_pose, bacth_abs_pos, self.batch_desire_abs_position, batch_abs_position, self.terminal_abs_weight, self.terminal_abs_position_weight)
         self.stage_cost += abs_terminal_cost
         min_energy = self.stage_cost.min()
@@ -391,9 +437,181 @@ class MPPILogStdModule():
         self.c = 0.0
         self.start_time = time.time()
 
+
+    def _terminal_manip_cost(self, rel_pose_vec8: torch.Tensor, rel_jacobian: torch.Tensor) -> torch.Tensor:
+        """Penalize low manipulability at the final rollout state.
+
+        We first map the 8D dual-quaternion Jacobian to a 6D twist Jacobian and
+        then apply the standard Yoshikawa manipulability on 6D.
+        """
+        j_twist = dq_jacobian_to_twist_jacobian(rel_pose_vec8, rel_jacobian)
+        if self.manip_metric in ("pdet", "svd", "pseudodet"):
+            return manipulability_cost_from_twist_jacobian_rows_pdet(
+                j_twist,
+                weight=float(self.manip_weight),
+                rows=self.manip_twist_rows,
+                k=self.manip_pdet_k,
+                eps=1e-12,
+            )
+        if self.manip_metric in ("gram_eig_scaled", "eig_scaled", "eigscale"):
+            return manipulability_cost_from_twist_jacobian_rows_gram_eig_scaled(
+                j_twist,
+                weight=float(self.manip_weight),
+                rows=self.manip_twist_rows,
+                last_k=3,
+                div=float(self.manip_gram_eig_last3_div),
+                eps=1e-12,
+            )
+        return manipulability_cost_from_twist_jacobian_rows(
+            j_twist,
+            weight=float(self.manip_weight),
+            rows=self.manip_twist_rows,
+            eps=1e-12,
+        )
+
+    def _compute_current_rel_pose_and_jacobian(self):
+        """Compute relative pose vec8 and DQ Jacobian at the current joint state (batch=1)."""
+        rel_pos, _, rel_jacobian, _, _ = rel_abs_pose_rel_jac(
+            self.gpu_robot1_dh_mat,
+            self.gpu_robot2_dh_mat,
+            self.batch_robot1_base[:1],
+            self.batch_robot2_base[:1],
+            self.batch_robot1_effector[:1],
+            self.batch_robot2_effector[:1],
+            self.batch_fake_robot1_q[:1],
+            self.batch_fake_robot2_q[:1],
+            self.batch_line_d[:1],
+            self.batch_quat_line_ref[:1],
+            self.robot1_q_num,
+            self.robot2_q_num,
+            self.robot1_dh_type,
+            self.robot2_dh_type,
+        )
+        return rel_pos, rel_jacobian
+
+    def _compute_current_twist_jacobian(self) -> torch.Tensor:
+        """Compute 6xN twist Jacobian at the current joint state (batch=1)."""
+        rel_pos, rel_jacobian = self._compute_current_rel_pose_and_jacobian()
+        return dq_jacobian_to_twist_jacobian(rel_pos, rel_jacobian)
+
+    def _compute_current_manipulability(self) -> float:
+        """Compute manipulability at the current joint state (batch=1)."""
+        j_twist = self._compute_current_twist_jacobian()
+        if self.manip_metric in ("pdet", "svd", "pseudodet"):
+            manip = manipulability_from_twist_jacobian_rows_pdet(
+                j_twist,
+                rows=self.manip_twist_rows,
+                k=self.manip_pdet_k,
+                eps=1e-12,
+            )
+        elif self.manip_metric in ("gram_eig_scaled", "eig_scaled", "eigscale"):
+            manip = manipulability_from_twist_jacobian_rows_gram_eig_scaled(
+                j_twist,
+                rows=self.manip_twist_rows,
+                last_k=3,
+                div=float(self.manip_gram_eig_last3_div),
+                eps=1e-12,
+            )
+        else:
+            manip = manipulability_from_twist_jacobian_rows(j_twist, rows=self.manip_twist_rows, eps=1e-12)
+        return float(manip[0, 0].item())
+
+    def _append_manip_log(self, manip_value: float) -> None:
+        step = int(self._manip_log_step)
+        t = float(time.time() - self._manip_log_t0)
+        self._manip_log_steps.append(step)
+        self._manip_log_times.append(t)
+        self._manip_log_manip.append(float(manip_value))
+
+        if self.manip_log_print_every and (step % max(int(self.manip_log_print_every), 1) == 0):
+            print(f"manip[{self.manip_twist_rows}] step={step} t={t:.3f} value={manip_value:.6g}")
+
+        if self.manip_log_path and (step % max(int(self.manip_log_flush_every), 1) == 0):
+            out_dir = os.path.dirname(self.manip_log_path)
+            if out_dir:
+                os.makedirs(out_dir, exist_ok=True)
+            np.savez(
+                self.manip_log_path,
+                step=np.asarray(self._manip_log_steps, dtype=np.int64),
+                t=np.asarray(self._manip_log_times, dtype=np.float64),
+                manipulability=np.asarray(self._manip_log_manip, dtype=np.float64),
+                rows=np.asarray(self.manip_twist_rows),
+                metric=np.asarray(self.manip_metric),
+                pdet_k=np.asarray(-1 if self.manip_pdet_k is None else int(self.manip_pdet_k), dtype=np.int64),
+                gram_eig_last3_div=np.asarray(float(self.manip_gram_eig_last3_div), dtype=np.float64),
+                weight=np.asarray(float(self.manip_weight), dtype=np.float64),
+            )
+    
     def play_once(self):
         self.update_joint_states()
+
+        # record manipulability at current joint state
+        try:
+            manip_now = self._compute_current_manipulability()
+            self._append_manip_log(manip_now)
+        except Exception as e:
+            if self.manip_log_print_every:
+                print("manip_log compute failed:", repr(e))
+        self._manip_log_step += 1
+
+        # debug: print converted twist jacobian (6xN)
+        if self.debug_print_twist_jacobian and (self._debug_step % max(int(self.debug_print_twist_jacobian_every), 1) == 0):
+            try:
+                j_twist = self._compute_current_twist_jacobian()[0]
+                try:
+                    rank_tw = int(torch.linalg.matrix_rank(j_twist).item())
+                except Exception:
+                    rank_tw = -1
+                print(
+                    "twist_jacobian[0] shape:",
+                    tuple(j_twist.shape),
+                    "rank:",
+                    rank_tw,
+                    "rows_mode:",
+                    self.manip_twist_rows,
+                    "metric:",
+                    self.manip_metric,
+                    "pdet_k:",
+                    self.manip_pdet_k,
+                )
+                print(j_twist)
+            except Exception as e:
+                print("twist_jacobian compute failed:", repr(e))
+
+        if self.debug_print_twist_spectrum and (self._debug_step % max(int(self.debug_print_twist_spectrum_every), 1) == 0):
+            try:
+                j_twist = self._compute_current_twist_jacobian()[0]
+                # Singular values (used by pdet)
+                s = torch.linalg.svdvals(j_twist)
+                # Eigenvalues of Gram matrix
+                gram = j_twist @ j_twist.transpose(-2, -1)
+                gram = 0.5 * (gram + gram.transpose(-2, -1))
+                eig = torch.linalg.eigvalsh(gram.to(torch.float64)).to(j_twist.dtype)
+                eig_adj = eig
+                div = float(self.debug_twist_gram_eig_last3_div)
+                if div != 1.0 and eig.numel() >= 3:
+                    eig_adj = eig.clone()
+                    eig_adj[-3:] = eig_adj[-3:] / div
+                print("twist_singular_values:", s)
+                print("gram_eigenvalues:", eig)
+                if div != 1.0 and eig.numel() >= 3:
+                    print(f"gram_eigenvalues_last3_div_{div:g}:", eig_adj)
+            except Exception as e:
+                print("twist_spectrum compute failed:", repr(e))
+
         mppi_u0, mppi_energy = self.mppi_worker()
+
+        if self.debug_print_rel_jacobian and (self._debug_step % max(int(self.debug_print_rel_jacobian_every), 1) == 0):
+            if self._last_rel_jacobian is not None:
+                j0 = self._last_rel_jacobian[0]
+                try:
+                    rank0 = int(torch.linalg.matrix_rank(j0).item())
+                except Exception:
+                    rank0 = -1
+                print("relative_jacobian[0] shape:", tuple(j0.shape), "rank:", rank0)
+                print(j0)
+        self._debug_step += 1
+
         p_u0, p_energy = self.traditional_control_result()
         print("mppi_energy: ", mppi_energy)
         print("p_energy: ", p_energy)

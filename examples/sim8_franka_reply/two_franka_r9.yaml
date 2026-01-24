@@ -47,9 +47,9 @@ mppi_T: 15
 mppi_seed: 0
 batch_size: 1000
 mean: 0.0
-std: 3.0
+std: 1.732050808
 gamma: 1.5
-an_std: 0.6
+an_std: 0.774596669
 log_std: 0.0
 num_clusters: 3
 common_num: 1
@@ -61,7 +61,7 @@ max_abs_tilt_angle: 8.0
 collision_constraint_weight: 1500.0
 q_limit_constraint_weight: 0
 q_vel_constraint_weight: 0
-tilt_constraint_weight: 0.0
+tilt_constraint_weight: 3.0
 # Mild penalty weights
 abs_weight: 0.00
 abs_position_weight: 0.0

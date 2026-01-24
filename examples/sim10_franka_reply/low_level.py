@@ -20,7 +20,7 @@ def main(args=None):
     # 步骤 3: 实例化DQ_SerialManipulatorDH
     desire_abs_pose = [-0.67977, -0.153082, 0.702202, -0.146254, 0.000243, -0.038812, -0.100193, -0.441557]
     desire_rel_pose = [-0.161469, 0.982784, -0.000002, 0.089794, 0.000098, -0.000579, 0.420438, 0.006521]
-
+    
     config_path = os.path.join(os.path.dirname(__file__), 'two_franka_r9.yaml')
     config = ConfigModule(config_path)
     low_level_module = LowLevelModule(config, desire_abs_pose, desire_rel_pose)

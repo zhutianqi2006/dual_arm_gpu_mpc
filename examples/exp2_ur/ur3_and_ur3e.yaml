@@ -40,9 +40,9 @@ mppi_T: 15
 mppi_seed: 0
 batch_size: 1000
 mean: 0.0
-std: 3.0
+std: 1.732050808
 gamma: 1.0
-an_std: 0.6
+an_std: 0.774596669
 log_std: 0.1
 num_clusters: 6
 common_num: 10
@@ -64,6 +64,19 @@ stagnation_weight: 8.0
 #stagnation_weight: 8.0
 terminal_abs_weight: 100.0
 terminal_abs_position_weight: 100.0
+# manipulability (optional)
+manip_enable: true
+manip_weight: 0.5
+manip_metric: 'gram_eig_scaled'   # pdet | yoshikawa | gram_eig_scaled
+manip_twist_rows: 'all6'          # all6 | first3 | last3
+manip_pdet_k: 6                   # only used when manip_metric=pdet
+manip_gram_eig_last_k: 3
+manip_gram_eig_last3_div: 5.0
+manip_eps: 1.0e-12
+# manipulability logging (npz under logs/)
+manip_log_enable: true
+manip_log_flush_every: 50
+manip_log_path: ''
 # high-level tradtition control parameters
 high_rel_gain: 0.02
 high_abs_gain: 2.0
@@ -88,3 +101,4 @@ robot1_ddq_min: [-2.0, -2.0, -2.0, -2.0, -2.0, -2.0]
 robot1_ddq_max: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
 robot2_ddq_min: [-2.0, -2.0, -2.0, -2.0, -2.0, -2.0]
 robot2_ddq_max: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+

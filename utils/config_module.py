@@ -62,6 +62,19 @@ class ConfigModule():
         self.q_acc_weight = config_data.get('q_acc_weight', 0.1)
         self.q_vel_weight = config_data.get('q_vel_weight', 0.1)
         self.stagnation_weight = config_data.get('stagnation_weight', 0.1)
+        self.manip_weight = config_data.get('manip_weight', 0.0)
+        self.manip_twist_rows = config_data.get('manip_twist_rows', 'all6')
+        self.manip_metric = config_data.get('manip_metric', 'yoshikawa')
+        self.manip_pdet_k = config_data.get('manip_pdet_k', None)
+        self.manip_gram_eig_last3_div = config_data.get('manip_gram_eig_last3_div', 10.0)
+
+        # Optional manipulability toggles/logging
+        self.manip_enable = config_data.get('manip_enable', None)
+        self.manip_eps = config_data.get('manip_eps', 1e-12)
+        self.manip_gram_eig_last_k = config_data.get('manip_gram_eig_last_k', 3)
+        self.manip_log_enable = config_data.get('manip_log_enable', False)
+        self.manip_log_flush_every = config_data.get('manip_log_flush_every', 50)
+        self.manip_log_path = config_data.get('manip_log_path', None)
         self.curobo_world_file = config_data.get('curobo_world_file', 'franka_dynamic_exp3_env.yml')
         self.curobo_robot_file = config_data.get('curobo_robot_file', 'dual_panda_curobo_obstacle.yml')
         # traditional control
@@ -72,6 +85,11 @@ class ConfigModule():
         # function c to change conrtoller
         self.c_eta = config_data.get('c_eta', 0.1)
         self.c_abs_max = config_data.get('c_abs_max', 0.1)
+
+        # CEM (refactored from MPPI) optional smoothing
+        # One-pole low-pass on the planned sequence: y[t] = a*y[t-1] + (1-a)*x[t]
+        # a in [0, 1). Larger -> smoother.
+        self.cem_lpf_alpha = config_data.get('cem_lpf_alpha', 0.8)
         # joint position limits
         self.robot1_q_min = config_data.get('robot1_q_min', [-3.0, -3.0, -3.0, -3.0, -3.0, -6.0])
         self.robot1_q_max = config_data.get('robot1_q_max', [3.0, 3.0, 3.0, 3.0, 3.0, 6.0])

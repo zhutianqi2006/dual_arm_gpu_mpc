@@ -22,7 +22,7 @@ if __name__ == "__main__":
     os.environ['ROS_DOMAIN_ID'] = '16'
     import rclpy
     rclpy.init(args=None)
-    desire_abs_pose = [-0.009809, -0.700866, -0.008828, 0.713171, 0.03289, -0.000662, -0.283115, -0.003703]
+    desire_abs_pose = [-0.009809, -0.700866, -0.008828, 0.713171, -0.002769, -0.000221, -0.318158, -0.004193]
     desire_rel_pose = [0.043815, 0.998793, 0.006783, 0.021159, 0.001626, -0.002018, 0.28023, 0.00204]
 
     cfg_path = os.path.join(os.path.dirname(__file__), "ur3_and_ur3e_1row.yaml")
@@ -35,8 +35,6 @@ if __name__ == "__main__":
         {"center": np.array([0.5, -0.06, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
         {"center": np.array([0.5, -0.12, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
         {"center": np.array([0.5, 0.12, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.5, -0.18, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
-        {"center": np.array([0.5, 0.18, 0.25]), "radius": 0.04, "buffer": 0.02, "weight": 2e6, "color": [1, 0, 0, 0.35]},
     ]
 
     ctrl = CrocoddylDDPVFIModule(cfg, desire_abs_pose, desire_rel_pose, obstacles)

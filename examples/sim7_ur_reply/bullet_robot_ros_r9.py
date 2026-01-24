@@ -51,28 +51,16 @@ def _default_obstacles():
         {"center": [0.5, -0.06, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.5, -0.12, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.5, 0.12, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.5, -0.18, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.5, 0.18, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.5, -0.24, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.5, 0.24, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.45, 0.00, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.45, 0.06, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.45, -0.06, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.45, -0.12, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.45, 0.12, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.45, -0.18, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.45, 0.18, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.45, -0.24, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.45, 0.24, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.40, 0.00, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.40, 0.06, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.40, -0.06, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.40, -0.12, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.40, 0.12, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.40, -0.18, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.40, 0.18, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.40, -0.24, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.40, 0.24, 0.25], "radius": 0.04, "color": rgba},
     ]
     return obs
 
@@ -247,9 +235,9 @@ class DualArmBulletModel(Node):
             "obstacles": obstacle_bodies,
         }
         pyb.resetDebugVisualizerCamera(
-            cameraDistance=1.0,
-            cameraYaw=51,
-            cameraPitch=-32,
+            cameraDistance=1.2,
+            cameraYaw=89, 
+            cameraPitch=-28, 
             cameraTargetPosition=[-0.0, 0.0, 0.0]
         )
         return dual_arm_robot, env_objs

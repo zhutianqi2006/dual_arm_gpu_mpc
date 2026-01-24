@@ -115,10 +115,10 @@ class DualArmRealModel(Node):
         self.pyb_dual_robot.reset_joint_configuration(self.dual_arm_joint_pos)
         
     def joint_pos_pub(self):
-        self.ur3_current_joint_pos += self.dt*self.ur3_current_joint_vel
-        self.ur3e_current_joint_pos += self.dt*self.ur3e_current_joint_vel
-        self.ur3_pos_msg.position = self.ur3_current_joint_pos.tolist()
-        self.ur3e_pos_msg.position = self.ur3e_current_joint_pos.tolist()
+        self.ur3_current_joint_pos = self.ur3_robot_receive.getActualQ()
+        self.ur3e_current_joint_pos = self.ur3e_robot_receive.getActualQ()
+        self.ur3_pos_msg.position = self.ur3_current_joint_pos
+        self.ur3e_pos_msg.position = self.ur3e_current_joint_pos
         self.publisher_ur3.publish(self.ur3_pos_msg)
         self.publisher_ur3e.publish(self.ur3e_pos_msg)
         self.dual_arm_joint_pos = np.concatenate((self.ur3_current_joint_pos, self.ur3e_current_joint_pos))

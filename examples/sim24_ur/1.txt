@@ -1,0 +1,249 @@
+# File: mppi_adpan_module.py (patched excerpt)
+# Note: Drop-in replacement for class method `MPPIAdpAnModule.mppi_worker2`.
+#      兼容原有接口：签名、返回值不变；内部改为进行 4 次递进优化（总计 5 次：mppi_worker 一次 + mppi_worker2 四次）。
+#      每次噪声方差依次为：base_std/2, /4, /8, /16（base_std = self.std）。
+
+import torch
+import numpy as np
+
+class MPPIAdpAnModule:
+    ...
+    def mppi_worker2(self):
+        """
+        多阶段细化搜索（第 2~5 次）。
+        - 仍使用对数噪声 `epsilon_generator_log`，但每一阶段缩小 std：self.std/[2,4,8,16]
+        - 每阶段均基于上一阶段的 self.last_mppi_result/self.current_mppi_result 继续滚动优化
+        - 返回最终 self.current_mppi_result 与各阶段能量的最小值
+        """
+        # 以 mppi_worker() 的输出为起点
+        _ = (self.current_mppi_result[0]).cpu().numpy()
+        robot1_q_temp = self.robot1_q
+        robot2_q_temp = self.robot2_q
+
+        base_std = float(self.std)
+        std_schedule = [base_std / 2.0, base_std / 4.0, base_std / 8.0, base_std / 16.0]
+
+        final_min_energy = float("inf")
+
+        for stage_idx, stage_std in enumerate(std_schedule, start=1):
+            # 每阶段从当前实关节配置启动一批并行 rollouts
+            self.batch_fake_robot1_q = torch.tensor(robot1_q_temp, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+            self.batch_fake_robot2_q = torch.tensor(robot2_q_temp, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+
+            batch_last_mppi_result = self.last_mppi_result.repeat(self.batch_size, 1, 1)
+
+            # 使用减小后的方差，改变种子避免与前一阶段完全一致
+            seed = int(self.mppi_seed) + stage_idx
+            robot1_acc_explore_seq, robot2_acc_explore_seq = epsilon_generator_log(
+                int(self.batch_size),
+                self.robot1_q_num,
+                self.robot2_q_num,
+                self.mppi_T,
+                float(self.mean),
+                float(stage_std),       # <—— 关键：逐阶段缩小 std
+                float(self.log_std),
+                float(self.mppi_dt * self.max_acc_abs_value),
+                seed,
+            )
+
+            batch_last_robot1_mppi_result = batch_last_mppi_result[:, :, : self.robot1_q_num]
+            batch_last_robot2_mppi_result = batch_last_mppi_result[:, :, self.robot1_q_num :]
+            batch_robot1_dq_seq = robot1_acc_explore_seq + batch_last_mppi_result[:, :, : self.robot1_q_num]
+            batch_robot2_dq_seq = robot2_acc_explore_seq + batch_last_mppi_result[:, :, self.robot1_q_num :]
+
+            self.last_batch_fake_robot1_q = self.batch_fake_robot1_q.clone()
+            self.last_batch_fake_robot2_q = self.batch_fake_robot2_q.clone()
+            self.first_batch_fake_robot1_q = self.batch_fake_robot1_q.clone()
+            self.first_batch_fake_robot2_q = self.batch_fake_robot2_q.clone()
+            self.stage_cost = torch.zeros(self.batch_size, 1, dtype=self.dtype, device=self.device)
+
+            for i in range(self.mppi_T):
+                if i == 0:
+                    (
+                        rel_pos,
+                        bacth_abs_pos,
+                        bacth_rel_jacobian,
+                        batch_abs_position,
+                        batch_angle,
+                    ) = rel_abs_pose_rel_jac(
+                        self.gpu_robot1_dh_mat,
+                        self.gpu_robot2_dh_mat,
+                        self.batch_robot1_base,
+                        self.batch_robot2_base,
+                        self.batch_robot1_effector,
+                        self.batch_robot2_effector,
+                        self.batch_fake_robot1_q,
+                        self.batch_fake_robot2_q,
+                        self.batch_line_d,
+                        self.batch_quat_line_ref,
+                        self.robot1_q_num,
+                        self.robot2_q_num,
+                        self.robot1_dh_type,
+                        self.robot2_dh_type,
+                    )
+                    bacth_rel_jacobian_null = get_rel_jacobian_null(
+                        bacth_rel_jacobian, self.robot1_q_num, self.robot2_q_num, self.batch_size
+                    )
+
+                batch_robot1_ith_dq, batch_robot2_ith_dq = get_current_vel(
+                    batch_robot1_dq_seq, batch_robot2_dq_seq, i
+                )
+
+                (
+                    batch_robot1_ith_proj_dq,
+                    batch_robot2_ith_proj_dq,
+                ) = get_proj_qd(
+                    batch_robot1_ith_dq,
+                    batch_robot2_ith_dq,
+                    self.robot1_q_num,
+                    self.robot2_q_num,
+                    bacth_rel_jacobian_null,
+                )
+                (
+                    last_batch_robot1_mppi_proj,
+                    last_batch_robot2_mppi_proj,
+                ) = get_proj_qd(
+                    batch_last_robot1_mppi_result[:, i, :],
+                    batch_last_robot2_mppi_result[:, i, :],
+                    self.robot1_q_num,
+                    self.robot2_q_num,
+                    bacth_rel_jacobian_null,
+                )
+
+                batch_robot1_ith_proj_dq = torch.clamp(
+                    batch_robot1_ith_proj_dq, self.gpu_robot1_dq_min, self.gpu_robot1_dq_max
+                )
+                batch_robot2_ith_proj_dq = torch.clamp(
+                    batch_robot2_ith_proj_dq, self.gpu_robot2_dq_min, self.gpu_robot2_dq_max
+                )
+
+                self.last_batch_fake_robot1_q = self.batch_fake_robot1_q
+                self.last_batch_fake_robot2_q = self.batch_fake_robot2_q
+
+                (
+                    self.batch_fake_robot1_q,
+                    self.batch_fake_robot2_q,
+                    batch_robot1_ith_proj_dq,
+                    batch_robot2_ith_proj_dq,
+                ) = update_joint_position_with_limits(
+                    self.batch_fake_robot1_q,
+                    self.batch_fake_robot2_q,
+                    batch_robot1_ith_proj_dq,
+                    batch_robot2_ith_proj_dq,
+                    self.gpu_robot1_q_min,
+                    self.gpu_robot1_q_max,
+                    self.gpu_robot2_q_min,
+                    self.gpu_robot2_q_max,
+                    float(self.mppi_dt),
+                )
+
+                robot1_acc_explore_seq[:, i, : self.robot1_q_num] = (
+                    batch_robot1_ith_proj_dq - last_batch_robot1_mppi_proj
+                )
+                robot2_acc_explore_seq[:, i, : self.robot2_q_num] = (
+                    batch_robot2_ith_proj_dq - last_batch_robot2_mppi_proj
+                )
+
+                robot1_acc_explore_seq[:, i, : self.robot1_q_num] = torch.clamp(
+                    robot1_acc_explore_seq[:, i, : self.robot1_q_num],
+                    self.mppi_dt * self.gpu_robot1_ddq_min,
+                    self.mppi_dt * self.gpu_robot1_ddq_max,
+                )
+                robot2_acc_explore_seq[:, i, : self.robot2_q_num] = torch.clamp(
+                    robot2_acc_explore_seq[:, i, : self.robot2_q_num],
+                    self.mppi_dt * self.gpu_robot2_ddq_min,
+                    self.mppi_dt * self.gpu_robot2_ddq_max,
+                )
+
+                (
+                    rel_pos,
+                    bacth_abs_pos,
+                    bacth_rel_jacobian,
+                    batch_abs_position,
+                    batch_angle,
+                ) = rel_abs_pose_rel_jac(
+                    self.gpu_robot1_dh_mat,
+                    self.gpu_robot2_dh_mat,
+                    self.batch_robot1_base,
+                    self.batch_robot2_base,
+                    self.batch_robot1_effector,
+                    self.batch_robot2_effector,
+                    self.batch_fake_robot1_q,
+                    self.batch_fake_robot2_q,
+                    self.batch_line_d,
+                    self.batch_quat_line_ref,
+                    self.robot1_q_num,
+                    self.robot2_q_num,
+                    self.robot1_dh_type,
+                    self.robot2_dh_type,
+                )
+                bacth_rel_jacobian_null = get_rel_jacobian_null(
+                    bacth_rel_jacobian, self.robot1_q_num, self.robot2_q_num, self.batch_size
+                )
+
+                abs_cost = get_abs_cost(
+                    self.batch_desire_abs_pose,
+                    bacth_abs_pos,
+                    self.batch_desire_abs_position,
+                    batch_abs_position,
+                    self.abs_weight,
+                    self.abs_position_weight,
+                )
+                vel_cost = get_vel_cost(
+                    batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq, self.q_vel_weight
+                )
+                tilt_constraint_cost = get_tilt_constraint_cost(
+                    batch_angle, self.batch_max_abs_tilt_angle, self.tilt_constraint_weight
+                )
+                acc_cost = get_acc_cost(
+                    batch_robot1_ith_proj_dq,
+                    batch_robot2_ith_proj_dq,
+                    batch_last_mppi_result,
+                    self.robot1_q_num,
+                    self.robot2_q_num,
+                    i,
+                    self.q_acc_weight,
+                )
+                collision_cost = self.get_collision_cost(self.collision_constraint_weight)
+                self.stage_cost += (
+                    abs_cost + vel_cost + collision_cost + acc_cost + tilt_constraint_cost
+                )
+
+            # 终端项
+            joint_change = (
+                torch.square(self.first_batch_fake_robot1_q - self.batch_fake_robot1_q).sum(dim=1, keepdim=True)
+                + torch.square(self.first_batch_fake_robot2_q - self.batch_fake_robot2_q).sum(dim=1, keepdim=True)
+            )
+            abs_terminal_cost = get_abs_cost(
+                self.batch_desire_abs_pose,
+                bacth_abs_pos,
+                self.batch_desire_abs_position,
+                batch_abs_position,
+                self.terminal_abs_weight,
+                self.terminal_abs_position_weight,
+            )
+            self.stage_cost += abs_terminal_cost + 0.01 * joint_change
+
+            # 权重与更新
+            stage_min_energy = self.stage_cost.min()
+            final_min_energy = min(final_min_energy, float(stage_min_energy))
+
+            epsilon = get_all_dq_seq(robot1_acc_explore_seq, robot2_acc_explore_seq)
+            w_epsilon = compute_weights(
+                epsilon, self.stage_cost, self.batch_size, self.param_lambda
+            )
+            w_epsilon = self.moving_average_filter(w_epsilon, int(self.mppi_T))
+            self.current_mppi_result = w_epsilon + self.last_mppi_result
+            self.current_mppi_result = torch.clamp(
+                self.current_mppi_result,
+                torch.cat((self.gpu_robot1_dq_min, self.gpu_robot2_dq_min)),
+                torch.cat((self.gpu_robot1_dq_max, self.gpu_robot2_dq_max)),
+            )
+            self.mppi_result_modefied()
+
+            # receding horizon：把当前结果往后平移一位，作为下一阶段的 last
+            self.last_mppi_result[:-1, :] = self.current_mppi_result[1:, :]
+            self.last_mppi_result[-1, :] = self.current_mppi_result[-1, :]
+
+        return self.current_mppi_result, final_min_energy
+    ...

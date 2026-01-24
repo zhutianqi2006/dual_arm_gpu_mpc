@@ -32,17 +32,17 @@ robot2_dh_parameters:
 robot2_base: [-0.612384, 0.353533, -0.353533, -0.612384, 0.087864, 0.013983, 0.013983, -0.087864]
 robot2_effector: [1, 0, 0, 0, 0, 0, 0, 0]
 high_level_u_topic: '/high_level_u'
-curobo_world_file: 'ur_p2p_exp1_env.yml'
+curobo_world_file: 'ur_ground.yml'
 curobo_robot_file: 'dual_arm_model_real.yml'
 # MPPI parameters
 mppi_dt: 0.15
-mppi_T: 15
+mppi_T: 10
 mppi_seed: 0
 batch_size: 1000
 mean: 0.0
-std: 3.0
+std: 1.732050808
 gamma: 0.5
-an_std: 1.0
+an_std: 0.774596669
 log_std: 0.1
 num_clusters: 3
 common_num: 1
@@ -64,7 +64,7 @@ q_vel_weight: 0.0
 stagnation_weight: 100.0
 #stagnation_weight: 8.0
 terminal_abs_weight: 100.0
-terminal_rel_weight: 200.0
+terminal_rel_weight: 250.0
 terminal_abs_position_weight: 100.0
 terminal_rel_position_weight: 0.0
 # high-level tradtition control parameters

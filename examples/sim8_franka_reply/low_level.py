@@ -12,7 +12,7 @@ from dqrobotics.robot_modeling import DQ_SerialManipulatorDH, DQ_CooperativeDual
 # DQ Robotics used in cuda
 from utils.config_module import ConfigModule
 from utils.low_ros_module import LowROSModule
-from utils.low_level_module import LowLevelModule
+from utils.low_level_line_module import LowLevelLineModule
 import rclpy
 def main(args=None):
     os.environ['ROS_DOMAIN_ID'] = '16'
@@ -20,10 +20,11 @@ def main(args=None):
     # 步骤 3: 实例化DQ_SerialManipulatorDH
     desire_abs_pose = [-0.67977, -0.153082, 0.702202, -0.146254, 0.000243, -0.038812, -0.100193, -0.441557]
     desire_rel_pose = [-0.161469, 0.982784, -0.000002, 0.089794, 0.000098, -0.000579, 0.420438, 0.006521]
-
+    desire_line_d = [0, 0, 0, 1]
+    desire_quat_line_ref = [0, -0.994308, 0.00868, 0.106191]
     config_path = os.path.join(os.path.dirname(__file__), 'two_franka_r9.yaml')
     config = ConfigModule(config_path)
-    low_level_module = LowLevelModule(config, desire_abs_pose, desire_rel_pose)
+    low_level_module = LowLevelLineModule(config, desire_abs_pose, desire_rel_pose)
     while True:
         low_level_module.play_once()
 

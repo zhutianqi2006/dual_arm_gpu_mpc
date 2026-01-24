@@ -51,8 +51,6 @@ def _default_obstacles():
         {"center": [0.5, -0.06, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.5, -0.12, 0.25], "radius": 0.04, "color": rgba},
         {"center": [0.5, 0.12, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.5, -0.18, 0.25], "radius": 0.04, "color": rgba},
-        {"center": [0.5, 0.18, 0.25], "radius": 0.04, "color": rgba},
     ]
     return obs
 

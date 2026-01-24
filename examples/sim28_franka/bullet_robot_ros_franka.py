@@ -1,0 +1,136 @@
+# Python standard lib
+import os
+import sys
+import math
+import pathlib
+from threading import Lock
+# pybullet to display
+import pybullet as pyb
+import pybullet_data
+import pyb_utils
+TIMESTEP = 1/125
+# ROS2
+import rclpy
+import rclpy.logging
+from rclpy.node import Node
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64MultiArray
+import numpy as np
+
+class DualArmBulletModel(Node):
+    def __init__(self, franka1_q, franka2_q,
+                 dt: float = 0.01):
+        super().__init__('dual_arm_model')
+        self.dt = dt
+        self.franka1_q = franka1_q
+        self.franka2_q = franka2_q
+        self.gui_id = pyb.connect(pyb.GUI)
+        self.pyb_dual_robot, self.obstacles = self.pyb_load_environment(self.gui_id) 
+        self.setup_ros2()
+
+    def setup_ros2(self):
+        # init robot1
+        self.franka1_pos_msg = JointState()
+        self.franka1_vel_msg = JointState()
+        self.franka1_pos_msg.name = ['joint1', 'joint2', 'joint3',
+                                     'joint4', 'joint5', 'joint6', 'joint7']
+        self.franka1_vel_msg.name = ['joint1', 'joint2', 'joint3',
+                                     'joint4', 'joint5', 'joint6', 'joint7']
+        self.franka1_vel_msg.velocity = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.franka1_current_joint_vel = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        self.franka1_current_joint_pos = self.franka1_q
+        self.publisher_franka1 = self.create_publisher(JointState,'franka1_joint_states', 1)
+        self.subscription_franka1_velocity = self.create_subscription(
+            JointState, 'franka1_joint_command', self.franka1_joint_vel_callback, 1)
+        # init robot2
+        self.franka2_pos_msg = JointState()
+        self.franka2_vel_msg = JointState()
+        self.franka2_pos_msg.name = ['joint1', 'joint2', 'joint3',
+                                     'joint4', 'joint5', 'joint6', 'joint7']
+        self.franka2_vel_msg.name = ['joint1', 'joint2', 'joint3',
+                                     'joint4', 'joint5', 'joint6', 'joint7']
+        self.franka2_vel_msg.velocity = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.franka2_current_joint_vel = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        self.franka2_current_joint_pos = self.franka2_q
+        self.publisher_franka2 = self.create_publisher(JointState, 'franka2_joint_states', 1)
+        self.subscription_franka2_velocity = self.create_subscription(
+            JointState, 'franka2_joint_command', self.franka2_joint_vel_callback, 1)
+        # setup ros2 publishers and subscribers
+        self.timer = self.create_timer(self.dt, self.joint_pos_pub)
+        # init subscriber for obstacle
+        self.obstacle_sub = self.create_subscription(
+            Float64MultiArray, 'moving_obstacle', self.obstacle_callback, 1)
+        
+    def obstacle_callback(self, msg:Float64MultiArray):
+        cube_id = self.obstacles["cube4"]
+        pyb.resetBasePositionAndOrientation(cube_id, msg.data[0:3], [1,0,0,0])
+
+    def franka1_joint_vel_callback(self, msg:JointState):
+        self.franka1_current_joint_vel = np.array(msg.velocity[:7])
+        
+    def franka2_joint_vel_callback(self, msg:JointState):
+        self.franka2_current_joint_vel = np.array(msg.velocity[:7])
+
+    def pyb_load_environment(self,client_id):
+        pyb.setTimeStep(TIMESTEP, physicsClientId=client_id)
+        pyb.setAdditionalSearchPath(pybullet_data.getDataPath(), physicsClientId=client_id)
+        # ground plane
+        ground_id = pyb.loadURDF("plane.urdf", [0, 0, 0], useFixedBase=True, physicsClientId=client_id)
+        dual_arm_robot_id = pyb.loadURDF(
+            "model/dual_panda_model/dual_panda_urdf.urdf",
+            [0, 0, 0],
+            useFixedBase=True,
+            physicsClientId=client_id
+        )
+        dual_arm_robot = pyb_utils.Robot(dual_arm_robot_id, client_id=client_id)
+        # some cubes for obstacles
+        cube1_id = pyb.loadURDF(
+            "model/plane/big_plane1.urdf", [0.55, 0.00, 0.43], useFixedBase=True, physicsClientId=client_id
+        )
+        cube2_id = pyb.loadURDF(
+            "model/plane/big_plane2.urdf", [0.55, 0.00, 0.50], useFixedBase=True, physicsClientId=client_id
+        )
+        # store body indices in a dict with more convenient key names
+        obstacles = {
+            "ground": ground_id,
+            "cube1": cube1_id,
+            "cube2": cube2_id,
+        }
+        pyb.resetDebugVisualizerCamera(
+        cameraDistance=1.6,
+        cameraYaw=90,
+        cameraPitch=-46,
+        cameraTargetPosition=[0, 0, 0.1]
+        )
+        return dual_arm_robot, obstacles
+
+    def pyb_update_joint_state(self):
+        self.pyb_dual_robot.reset_joint_configuration(self.dual_arm_joint_pos)
+        
+    def joint_pos_pub(self):
+        # robot1
+        self.franka1_current_joint_pos += self.dt*self.franka1_current_joint_vel
+        self.franka1_pos_msg.position = self.franka1_current_joint_pos.tolist()
+        self.publisher_franka1.publish(self.franka1_pos_msg)
+        # robot2
+        self.franka2_current_joint_pos += self.dt*self.franka2_current_joint_vel
+        self.franka2_pos_msg.position = self.franka2_current_joint_pos.tolist()
+        self.publisher_franka2.publish(self.franka2_pos_msg)
+        # robot1 and robot2 gripper
+        robot1_gripper_pos =np.array([0.01, 0.01])
+        robot2_gripper_pos =np.array([0.01, 0.01])
+        # concatenate joint positions
+        self.dual_arm_joint_pos = np.concatenate((self.franka1_current_joint_pos, robot1_gripper_pos, self.franka2_current_joint_pos, robot2_gripper_pos))
+        self.pyb_update_joint_state()
+
+def main(args=None):
+    os.environ['ROS_DOMAIN_ID'] = '16'
+    rclpy.init(args=args)
+    franka1_q = np.array([1.2666716500354116, -0.9869800303190713, -1.5651074744022262, -1.4033748241837867,  0.6253245698990879,  1.133453948590221, 0.9050454346760861])
+    franka2_q = np.array([-0.9119943548202025, 0.4042540428908486, -0.13238407256390972, -1.301102234175875, -1.7316200882043775, 2.5964338990501123, 1.0235231385490275])
+    dual_arm_model= DualArmBulletModel(franka1_q , franka2_q, 0.008)
+    rclpy.spin(dual_arm_model)
+    
+  
+if __name__ == "__main__":
+    main()

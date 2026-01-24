@@ -1,0 +1,913 @@
+# =============================
+# file: mppi_kmeans_adpan_sg_plot_module.py
+# (UPDATED) — Add SG logging for second MPPI (mppi_worker2)
+# =============================
+#!/usr/bin/env python
+# system library
+import os
+import time
+import numpy as np
+import math
+from math import pi
+import threading
+import torch
+from datetime import datetime
+# curobo for collision detection
+from curobo.types.base import TensorDeviceType
+from curobo.wrap.model.robot_world import RobotWorld, RobotWorldConfig
+# DQ Robotics cpu
+from dqrobotics import i_, j_, k_, E_, DQ, vec8 ,vec4
+from dqrobotics.robot_modeling import DQ_SerialManipulatorDH, DQ_SerialManipulatorMDH, DQ_CooperativeDualTaskSpace
+# DQ Robotics used in cuda
+from dq_torch import rel_abs_pose_rel_jac, dq_inv ,dq_mult ,rotation_angle, dq_translation
+from utils.config_module import ConfigModule
+from utils.high_ros_module import HighROSModule
+from kmeans_pytorch import kmeans
+# 
+import rclpy
+import array
+
+class MPPIKmeansAdpAnSgPlotModule():
+    def __init__(self, config: ConfigModule , desire_abs_pose: torch.Tensor, desire_abs_position: torch.Tensor,
+                 desire_rel_pose: torch.Tensor, desire_line_d: torch.Tensor,  desire_quat_line_ref: torch.Tensor):
+        # torch type
+        self.dtype = torch.float32
+        self.device = "cuda:0"
+        # mppi parameters
+        self.mppi_T = config.mppi_T
+        self.mppi_dt = config.mppi_dt
+        self.mppi_seed = config.mppi_seed
+        self.batch_size = config.batch_size
+        self.min_collision_distance = config.min_collision_distance
+        self.min_self_collision_distance = config.min_self_collision_distance
+        self.mean = config.mean
+        self.std = config.std
+        self.an_std = config.an_std
+        self.log_std = config.log_std
+        self.gamma = config.gamma
+        self.batch_eps = 1e-8*torch.eye(8, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1, 1)
+        self.param_lambda = 0.5
+        self.max_acc_abs_value = config.max_acc_abs_value
+        self.warm_up_flag = False
+        self.max_abs_tilt_angle = config.max_abs_tilt_angle 
+        # mppi weight
+        self.collision_constraint_weight = config.collision_constraint_weight
+        self.q_limit_constraint_weight = config.q_limit_constraint_weight
+        self.q_vel_constraint_weight = config.q_vel_constraint_weight
+        self.tilt_constraint_weight = config.tilt_constraint_weight
+        self.abs_weight = config.abs_weight
+        self.abs_position_weight = config.abs_position_weight
+        self.terminal_abs_weight = config.terminal_abs_weight
+        self.stagnation_weight = config.stagnation_weight
+        self.terminal_abs_position_weight = config.terminal_abs_position_weight
+        self.q_acc_weight = config.q_acc_weight
+        self.q_vel_weight = config.q_vel_weight
+        self.num_clusters = config.num_clusters
+        self.common_num = config.common_num
+        # robot 1 
+        self.robot1_dh_mat = config.robot1_dh_mat
+        self.robot1_base = config.robot1_base 
+        self.robot1_effector = config.robot1_effector
+        self.robot1_q_num = config.robot1_q_num
+        self.robot1_dh_type = config.robot1_dh_type
+        # robot 2
+        self.robot2_dh_mat = config.robot2_dh_mat
+        self.robot2_base = config.robot2_base
+        self.robot2_effector = config.robot2_effector
+        self.robot2_q_num = config.robot2_q_num
+        self.robot2_dh_type = config.robot2_dh_type
+        # joint position limits
+        self.robot1_q_min = config.robot1_q_min
+        self.robot1_q_max = config.robot1_q_max
+        self.robot2_q_min = config.robot2_q_min
+        self.robot2_q_max = config.robot2_q_max
+        # joint velocity limits
+        self.robot1_dq_min = config.robot1_dq_min
+        self.robot1_dq_max = config.robot1_dq_max
+        self.robot2_dq_min = config.robot2_dq_min
+        self.robot2_dq_max = config.robot2_dq_max
+        # joint acc limits
+        self.robot1_ddq_min = config.robot1_ddq_min
+        self.robot1_ddq_max = config.robot1_ddq_max
+        self.robot2_ddq_min = config.robot2_ddq_min
+        self.robot2_ddq_max = config.robot2_ddq_max
+        # other parameters
+        self.desire_abs_pose = desire_abs_pose
+        self.desire_abs_position = desire_abs_position
+        self.desire_rel_pose = desire_rel_pose
+        self.desire_line_d = desire_line_d
+        self.desire_quat_line_ref = desire_quat_line_ref
+        self.high_rel_gain = config.high_rel_gain
+        self.high_abs_gain = config.high_abs_gain
+        self.c_abs_max = config.c_abs_max
+        self.c_eta = config.c_eta
+        self.c = 0
+        self.init_cpu_dq_model()
+        # make them to tensor
+        self.init_tensor()
+        # curobo collision model
+        self.curobo_world_file = config.curobo_world_file
+        self.curobo_robot_file = config.curobo_robot_file
+        self.init_collision_model()
+        self.ros_module = HighROSModule(config)
+        self.ros_thread = threading.Thread(target=self.ros_module.run)
+        self.ros_thread.start()
+
+        # ----------------- Added: SG logging setup -----------------
+        self.enable_sg_logging = getattr(config, 'enable_sg_logging', True)
+        self.sg_window_length = int(getattr(config, 'sg_window_length', 11))  # default odd
+        self.sg_polyorder = int(getattr(config, 'sg_polyorder', 3))
+        self.log_dir = str(getattr(config, 'log_dir', './logs'))
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.session_log_dir = os.path.join(self.log_dir, f'mppi2_sg_{ts}')
+        self._ensure_dir(self.session_log_dir)
+        self.sg_iter = 0
+        # -----------------------------------------------------------
+
+    # ----------------- Added helpers for SG logging --------------
+    def _ensure_dir(self, path: str) -> None:
+        try:
+            os.makedirs(path, exist_ok=True)
+        except Exception as e:
+            # why: 若目录不可创建，不影响主流程控制
+            print(f"[warn] failed to create dir {path}: {e}")
+
+    def _fix_sg_params(self, T: int) -> tuple:
+        """Return (window, poly) corrected for valid SG params. If impossible, return (None, None)."""
+        if T < 3:
+            return (None, None)
+        w = min(self.sg_window_length, T)
+        if w % 2 == 0:
+            w -= 1
+        if w < 3:
+            return (None, None)
+        p = min(self.sg_polyorder, w - 1)
+        if p >= w:
+            p = w - 1
+        if p < 1:
+            p = 1
+        return (w, p)
+
+    def _apply_sg_filter(self, u_np: np.ndarray) -> np.ndarray:
+        """Apply SG along time axis (axis=0). Fallback to moving average if scipy not available.
+        u_np shape: (T, num_joints)
+        """
+        T = u_np.shape[0]
+        w, p = self._fix_sg_params(T)
+        if w is None:
+            return u_np.copy()
+        try:
+            from scipy.signal import savgol_filter
+            # why: SG 在时间轴上滤波，保持列（各关节）独立
+            return savgol_filter(u_np, window_length=w, polyorder=p, axis=0, mode='interp')
+        except Exception as e:
+            # Fallback: simple moving average
+            k = w
+            kernel = np.ones(k, dtype=np.float64) / k
+            out = np.empty_like(u_np)
+            for j in range(u_np.shape[1]):
+                out[:, j] = np.convolve(u_np[:, j], kernel, mode='same')
+            return out
+
+    def _save_mppi2_sg_log(self, pre_np: np.ndarray, post_np: np.ndarray) -> None:
+        if not self.enable_sg_logging:
+            return
+        try:
+            T = pre_np.shape[0]
+            t = np.arange(T, dtype=np.float64) * float(self.mppi_dt)
+            path = os.path.join(self.session_log_dir, f"mppi2_sg_{self.sg_iter:06d}.npz")
+            np.savez_compressed(
+                path,
+                pre=pre_np.astype(np.float32),
+                post=post_np.astype(np.float32),
+                t=t.astype(np.float32),
+                dt=np.float32(self.mppi_dt),
+                robot1_q_num=np.int32(self.robot1_q_num),
+                robot2_q_num=np.int32(self.robot2_q_num),
+            )
+            self.sg_iter += 1
+        except Exception as e:
+            print(f"[warn] failed to save SG log: {e}")
+    # -------------------------------------------------------------
+
+    def init_cpu_dq_model(self):
+        self.cpu_desire_abs_pose = DQ(self.desire_abs_pose)
+        self.cpu_desire_abs_pose = self.cpu_desire_abs_pose.normalize()
+        self.cpu_desire_abs_pose = vec8(self.cpu_desire_abs_pose)
+        self.cpu_desire_rel_pose = DQ(self.desire_rel_pose)
+        self.cpu_desire_rel_pose = self.cpu_desire_rel_pose.normalize()
+        self.cpu_desire_rel_pose = vec8(self.cpu_desire_rel_pose)
+        self.cpu_desire_line_d = DQ(self.desire_line_d)
+        self.cpu_desire_quat_line_ref = DQ(self.desire_quat_line_ref)
+        
+        # robot1
+        robot1_config_dh_mat = np.array(self.robot1_dh_mat)
+        self.cpu_robot1_dh_mat =  robot1_config_dh_mat.T
+        self.cpu_robot1_base = DQ(self.robot1_base)
+        self.cpu_robot1_base = self.cpu_robot1_base.normalize() 
+        self.cpu_robot1_effector = DQ(self.robot1_effector)
+        self.cpu_robot1_effector = self.cpu_robot1_effector.normalize()
+        if self.robot1_dh_type == 1:
+            self.cpu_robot1 = DQ_SerialManipulatorMDH(self.cpu_robot1_dh_mat)
+        else:
+            self.cpu_robot1 = DQ_SerialManipulatorDH(self.cpu_robot1_dh_mat)
+        self.cpu_robot1.set_base_frame(self.cpu_robot1_base)
+        self.cpu_robot1.set_reference_frame(self.cpu_robot1_base)
+        self.cpu_robot1.set_effector(self.cpu_robot1_effector)
+        # robot2
+        robot2_config_dh_mat = np.array(self.robot2_dh_mat)
+        self.cpu_robot2_dh_mat =  robot2_config_dh_mat.T
+        self.cpu_robot2_base = DQ(self.robot2_base)
+        self.cpu_robot2_base = self.cpu_robot2_base.normalize()
+        self.cpu_robot2_effector = DQ(self.robot2_effector)
+        self.cpu_robot2_effector = self.cpu_robot2_effector.normalize()
+        if self.robot2_dh_type == 1:
+            self.cpu_robot2 = DQ_SerialManipulatorMDH(self.cpu_robot2_dh_mat)
+        else:
+            self.cpu_robot2 = DQ_SerialManipulatorDH(self.cpu_robot2_dh_mat)
+        self.cpu_robot2.set_base_frame(self.cpu_robot2_base)
+        self.cpu_robot2.set_reference_frame(self.cpu_robot2_base)
+        self.cpu_robot2.set_effector(self.cpu_robot2_effector)
+        # robot2 and robot1
+        self.cpu_dq_dual_arm_model = DQ_CooperativeDualTaskSpace(self.cpu_robot1, self.cpu_robot2)
+
+    def init_ros(self):
+        self.ros_thread = threading.Thread(target=self.ros_module.run)
+        self.ros_thread.start()
+
+    def update_joint_states(self):
+        self.robot1_q, self.robot2_q = self.ros_module.read_joint_state()
+        self.batch_fake_robot1_q = torch.tensor(self.robot1_q, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        self.batch_fake_robot2_q = torch.tensor(self.robot2_q, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+
+    def init_tensor(self):
+        self.gpu_desire_abs_pose = torch.tensor(self.desire_abs_pose, device=self.device, dtype=self.dtype)
+        self.gpu_desire_abs_position = torch.tensor(self.desire_abs_position, device=self.device, dtype=self.dtype)
+        self.gpu_desire_rel_pose = torch.tensor(self.desire_rel_pose, device=self.device, dtype=self.dtype)
+        self.batch_line_d = torch.tensor(self.desire_line_d, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        self.batch_quat_line_ref = torch.tensor(self.desire_quat_line_ref, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        # robot q min max
+        self.gpu_robot1_q_min = torch.tensor(self.robot1_q_min, device=self.device, dtype=self.dtype)
+        self.gpu_robot1_q_max = torch.tensor(self.robot1_q_max, device=self.device, dtype=self.dtype)
+        self.gpu_robot2_q_min = torch.tensor(self.robot2_q_min, device=self.device, dtype=self.dtype)
+        self.gpu_robot2_q_max = torch.tensor(self.robot2_q_max, device=self.device, dtype=self.dtype)
+        # robot dq min max
+        self.gpu_robot1_dq_min = torch.tensor(self.robot1_dq_min, device=self.device, dtype=self.dtype)
+        self.gpu_robot1_dq_max = torch.tensor(self.robot1_dq_max, device=self.device, dtype=self.dtype)
+        self.gpu_robot2_dq_min = torch.tensor(self.robot2_dq_min, device=self.device, dtype=self.dtype)
+        self.gpu_robot2_dq_max = torch.tensor(self.robot2_dq_max, device=self.device, dtype=self.dtype)
+        # robot ddq min max
+        self.gpu_robot1_ddq_min = torch.tensor(self.robot1_ddq_min, device=self.device, dtype=self.dtype)
+        self.gpu_robot1_ddq_max = torch.tensor(self.robot1_ddq_max, device=self.device, dtype=self.dtype)
+        self.gpu_robot2_ddq_min = torch.tensor(self.robot2_ddq_min, device=self.device, dtype=self.dtype)
+        self.gpu_robot2_ddq_max = torch.tensor(self.robot2_ddq_max, device=self.device, dtype=self.dtype)
+        # init desire pose tensor
+        self.batch_desire_abs_position = self.gpu_desire_abs_position.repeat(self.batch_size, 1)
+        self.batch_desire_abs_pose = self.gpu_desire_abs_pose.repeat(self.batch_size, 1)
+        self.batch_desire_rel_pose = self.gpu_desire_rel_pose.repeat(self.batch_size, 1)
+        # robot 1 
+        self.gpu_robot1_dh_mat = torch.tensor(self.robot1_dh_mat, device=self.device, dtype= torch.float32)
+        self.gpu_robot1_dh_mat = self.gpu_robot1_dh_mat.reshape(-1).contiguous()
+        self.gpu_robot1_base  = torch.tensor(self.robot1_base, device=self.device, dtype=self.dtype)
+        self.batch_robot1_base = self.gpu_robot1_base.repeat(self.batch_size, 1)
+        self.gpu_robot1_effector  = torch.tensor(self.robot1_effector, device=self.device, dtype=self.dtype)
+        self.batch_robot1_effector  = self.gpu_robot1_effector.repeat(self.batch_size, 1)
+        # robot 2
+        self.gpu_robot2_dh_mat = torch.tensor(self.robot2_dh_mat, device=self.device, dtype= torch.float32)
+        self.gpu_robot2_dh_mat = self.gpu_robot2_dh_mat.reshape(-1).contiguous()
+        self.gpu_robot2_base  = torch.tensor(self.robot2_base, device=self.device, dtype=self.dtype)
+        self.batch_robot2_base = self.gpu_robot2_base.repeat(self.batch_size, 1)
+        self.gpu_robot2_effector  = torch.tensor(self.robot2_effector, device=self.device, dtype=self.dtype)
+        self.batch_robot2_effector  = self.gpu_robot2_effector.repeat(self.batch_size, 1)
+        # MPPI
+        self.last_mppi_result = torch.zeros(self.mppi_T, (self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
+        self.current_mppi_result = torch.zeros(self.mppi_T, (self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
+        self.first_element_mppi_result = torch.zeros((self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
+        self.batch_max_abs_tilt_angle = torch.tensor(self.max_abs_tilt_angle, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        # joint position limits
+        self.batch_robot1_q_min = torch.tensor(self.robot1_q_min, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        self.batch_robot1_q_max = torch.tensor(self.robot1_q_max, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        self.batch_robot2_q_min = torch.tensor(self.robot2_q_min, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        self.batch_robot2_q_max = torch.tensor(self.robot2_q_max, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        # joint velocity limits
+        self.batch_robot1_dq_min = torch.tensor(self.robot1_dq_min, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        self.batch_robot1_dq_max = torch.tensor(self.robot1_dq_max, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        self.batch_robot2_dq_min = torch.tensor(self.robot2_dq_min, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        self.batch_robot2_dq_max = torch.tensor(self.robot2_dq_max, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+
+    def init_collision_model(self):
+        self.tensor_args = TensorDeviceType()
+        self.curobo_config = RobotWorldConfig.load_from_config(self.curobo_robot_file, self.curobo_world_file, 
+                                                               collision_activation_distance=self.min_collision_distance,
+                                                               self_collision_activation_distance=self.min_self_collision_distance)
+        self.curobo_fn = RobotWorld(self.curobo_config)
+        self.curobo_fn2 = RobotWorld(self.curobo_config)
+        
+    def update_obstacle_velocity_estimate(self):
+        pass
+        
+    def get_collision_cost(self, weight:float):
+        q = torch.cat((self.batch_fake_robot1_q, self.batch_fake_robot2_q), dim=1)
+        q_mid = torch.cat(((self.last_batch_fake_robot1_q+self.batch_fake_robot1_q)/2.0, (self.last_batch_fake_robot2_q+self.batch_fake_robot2_q)/2.0), dim=1)
+        d_world1, d_self1 = self.curobo_fn.get_world_self_collision_distance_from_joints(q)
+        d_world2, d_self2 = self.curobo_fn.get_world_self_collision_distance_from_joints(q_mid)
+        d_new = d_world1 + d_world2 + d_self1 + d_self2
+        d_new[d_new!=0] = weight
+        num_samples = d_new.size(0)
+        return d_new.view(num_samples, 1)
+
+    def moving_average_filter(self, xx: torch.Tensor, window_size: int) -> torch.Tensor:
+        """Apply moving average filter for smoothing input sequence, using numpy internally."""
+        # Convert to numpy
+        xx_np = xx.cpu().numpy()
+        b = np.ones(window_size) / window_size
+        num_steps, num_controls = xx_np.shape
+        xx_mean_np = np.zeros_like(xx_np)
+        
+        # Apply moving average filter
+        for d in range(num_controls):
+            convolved = np.convolve(xx_np[:, d], b, mode='same')
+            half_window = window_size // 2
+            xx_mean_np[:, d] = convolved
+        
+        # Convert back to torch tensor on the same device as input
+        xx_mean = torch.from_numpy(xx_mean_np).to(xx.device)
+        return xx_mean
+    
+    def mppi_worker(self):
+        # init ur3 dual quaternion modelwa
+        batch_last_mppi_result = self.last_mppi_result.repeat(self.batch_size, 1, 1)
+        robot1_acc_explore_seq, robot2_acc_explore_seq = epsilon_generator_colored(int(self.batch_size), self.robot1_q_num, self.robot2_q_num, self.mppi_T,
+                                                                               self.mean, self.std, self.gamma, self.mppi_dt*self.max_acc_abs_value, self.mppi_seed)
+        batch_last_robot1_mppi_result = batch_last_mppi_result[:,:,:self.robot1_q_num]
+        batch_last_robot2_mppi_result = batch_last_mppi_result[:,:, self.robot1_q_num:]
+        batch_robot1_dq_seq = robot1_acc_explore_seq + batch_last_mppi_result[:,:,:self.robot1_q_num]
+        batch_robot2_dq_seq = robot2_acc_explore_seq + batch_last_mppi_result[:,:, self.robot1_q_num:]
+        self.last_batch_fake_robot1_q = self.batch_fake_robot1_q.clone()
+        self.last_batch_fake_robot2_q = self.batch_fake_robot2_q.clone()
+        self.first_batch_fake_robot1_q = self.batch_fake_robot1_q.clone()
+        self.first_batch_fake_robot2_q = self.batch_fake_robot2_q.clone()
+        self.stage_cost = torch.zeros(self.batch_size, 1, dtype = self.dtype, device = self.device)
+        for i in range(self.mppi_T):
+            if i == 0:
+                rel_pos, bacth_abs_pos, bacth_rel_jacobian, batch_abs_position, batch_angle = rel_abs_pose_rel_jac(self.gpu_robot1_dh_mat, self.gpu_robot2_dh_mat,
+                                                     self.batch_robot1_base,  self.batch_robot2_base, 
+                                                     self.batch_robot1_effector, self.batch_robot2_effector, 
+                                                     self.batch_fake_robot1_q, self.batch_fake_robot2_q,
+                                                     self.batch_line_d, self.batch_quat_line_ref, self.robot1_q_num, self.robot2_q_num, self.robot1_dh_type, self.robot2_dh_type)
+                bacth_rel_jacobian_null =  get_rel_jacobian_null(bacth_rel_jacobian, self.robot1_q_num, self.robot2_q_num, self.batch_size)
+
+            batch_robot1_ith_dq, batch_robot2_ith_dq = get_current_vel(batch_robot1_dq_seq, batch_robot2_dq_seq, i)
+
+            batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq = get_proj_qd(batch_robot1_ith_dq, batch_robot2_ith_dq, 
+                                                                             self.robot1_q_num, self.robot2_q_num, bacth_rel_jacobian_null)
+            last_batch_robot1_mppi_proj, last_batch_robot2_mppi_proj = get_proj_qd(batch_last_robot1_mppi_result[:,i,:], batch_last_robot2_mppi_result[:,i,:], 
+                                                                             self.robot1_q_num, self.robot2_q_num, bacth_rel_jacobian_null)
+            batch_robot1_ith_proj_dq = torch.clamp(batch_robot1_ith_proj_dq, self.gpu_robot1_dq_min, self.gpu_robot1_dq_max)
+            batch_robot2_ith_proj_dq = torch.clamp(batch_robot2_ith_proj_dq, self.gpu_robot2_dq_min, self.gpu_robot2_dq_max)
+            self.last_batch_fake_robot1_q = self.batch_fake_robot1_q
+            self.last_batch_fake_robot2_q = self.batch_fake_robot2_q
+            # update fake joint position
+            self.batch_fake_robot1_q, self.batch_fake_robot2_q, batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq=update_joint_position_with_limits(self.batch_fake_robot1_q, self.batch_fake_robot2_q, 
+                                        batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq,
+                                        self.gpu_robot1_q_min, self.gpu_robot1_q_max, 
+                                        self.gpu_robot2_q_min, self.gpu_robot2_q_max, self.mppi_dt)
+            robot1_acc_explore_seq[:,i,:self.robot1_q_num] = batch_robot1_ith_proj_dq- last_batch_robot1_mppi_proj
+            robot2_acc_explore_seq[:,i,:self.robot2_q_num] = batch_robot2_ith_proj_dq- last_batch_robot2_mppi_proj
+            robot1_acc_explore_seq[:,i,:self.robot1_q_num] = torch.clamp(robot1_acc_explore_seq[:,i,:self.robot1_q_num], self.mppi_dt*self.gpu_robot1_ddq_min, self.mppi_dt*self.gpu_robot1_ddq_max)
+            robot2_acc_explore_seq[:,i,:self.robot2_q_num] = torch.clamp(robot2_acc_explore_seq[:,i,:self.robot2_q_num], self.mppi_dt*self.gpu_robot2_ddq_min, self.mppi_dt*self.gpu_robot2_ddq_max)
+            
+            rel_pos, bacth_abs_pos, bacth_rel_jacobian, batch_abs_position, batch_angle = rel_abs_pose_rel_jac(self.gpu_robot1_dh_mat, self.gpu_robot2_dh_mat,
+                                                     self.batch_robot1_base,  self.batch_robot2_base, 
+                                                     self.batch_robot1_effector, self.batch_robot2_effector, 
+                                                     self.batch_fake_robot1_q, self.batch_fake_robot2_q,
+                                                     self.batch_line_d, self.batch_quat_line_ref, self.robot1_q_num, self.robot2_q_num, self.robot1_dh_type, self.robot2_dh_type)
+            bacth_rel_jacobian_null =  get_rel_jacobian_null(bacth_rel_jacobian, self.robot1_q_num, self.robot2_q_num, self.batch_size)
+            abs_cost = get_abs_cost(self.batch_desire_abs_pose, bacth_abs_pos, self.batch_desire_abs_position, batch_abs_position, self.abs_weight, self.abs_position_weight)
+            vel_cost = get_vel_cost(batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq, self.q_vel_weight)
+            tilt_constraint_cost = get_tilt_constraint_cost(batch_angle, self.batch_max_abs_tilt_angle, self.tilt_constraint_weight)
+            if i == 0:
+                acc_cost = get_acc_cost(batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq, batch_last_mppi_result, self.robot1_q_num, self.robot2_q_num, i, self.q_acc_weight)
+            collision_cost = self.get_collision_cost(self.collision_constraint_weight)
+            self.stage_cost += (abs_cost + vel_cost+ collision_cost + tilt_constraint_cost)
+        
+        joint_change = torch.square(self.first_batch_fake_robot1_q-self.batch_fake_robot1_q).sum(dim=1, keepdim=True)+torch.square(self.first_batch_fake_robot2_q-self.batch_fake_robot2_q).sum(dim=1, keepdim=True)
+        min_joint_change = 0.001
+        joint_change = torch.clamp(joint_change, min=min_joint_change)
+        stagnation_cost = self.stagnation_weight*joint_change
+        abs_terminal_cost = get_abs_cost(self.batch_desire_abs_pose, bacth_abs_pos, self.batch_desire_abs_position, batch_abs_position, self.terminal_abs_weight, self.terminal_abs_position_weight)
+        
+        self.stage_cost += acc_cost + abs_terminal_cost + abs_terminal_cost/stagnation_cost
+       
+        stage_median_value = torch.median(self.stage_cost)
+        normalized_stage_cost = self.stage_cost - stage_median_value
+        stage_min_value = torch.min(normalized_stage_cost)
+        stage_max_value = torch.max(normalized_stage_cost)
+        scaled_stage_cost =  (self.robot1_q_num+self.robot2_q_num)*(normalized_stage_cost - stage_min_value) / (2*stage_max_value - 2*stage_min_value)
+        exp_cost= stagnation_cost
+        exp_median_value = torch.median(exp_cost)
+        normalized_exp_cost = exp_cost - exp_median_value
+        exp_min_value = torch.min(normalized_exp_cost)
+        exp_max_value = torch.max(normalized_exp_cost)
+        scaled_exp_cost =  (normalized_exp_cost - exp_min_value) / (exp_max_value - exp_min_value)
+        abs_median_terminal_cost = torch.median(abs_terminal_cost)
+        normalized_abs_terminal_cost = abs_terminal_cost - abs_median_terminal_cost
+        abs_min_terminal_cost = torch.min(normalized_abs_terminal_cost)
+        abs_max_terminal_cost = torch.max(normalized_abs_terminal_cost)
+        scaled_abs_terminal_cost =  (normalized_abs_terminal_cost - abs_min_terminal_cost) / (abs_max_terminal_cost - abs_min_terminal_cost)
+        normalized_abs_pos = bacth_abs_pos
+        abs_pos_min = torch.min(normalized_abs_pos)
+        abs_pos_max = torch.max(normalized_abs_pos)
+        scaled_abs_pos =  (normalized_abs_pos - abs_pos_min) / (abs_pos_max - abs_pos_min)
+
+        robot1_q_change = self.first_batch_fake_robot1_q-self.batch_fake_robot1_q
+        robot2_q_change = self.first_batch_fake_robot2_q-self.batch_fake_robot2_q
+        robot1_q_change_min = torch.min(robot1_q_change)
+        robot1_q_change_max = torch.max(robot1_q_change)
+        robot2_q_change_min = torch.min(robot2_q_change)
+        robot2_q_change_max = torch.max(robot2_q_change)
+        scaled_robot1_q_change =  (robot1_q_change - robot1_q_change_min) / (robot1_q_change_max - robot1_q_change_min)
+        scaled_robot2_q_change =  (robot2_q_change - robot2_q_change_min) / (robot2_q_change_max - robot2_q_change_min)
+
+        num_clusters =  self.num_clusters 
+        combined_tensor = torch.cat((scaled_stage_cost/10.0, scaled_robot1_q_change, scaled_robot2_q_change), dim=1)
+        min_energy = self.stage_cost.min()
+        min_index = self.stage_cost.argmin()
+        cluster_ids_x, cluster_centers = kmeans(
+            X=combined_tensor, num_clusters=num_clusters, distance='euclidean', device=torch.device('cuda:0'), tol=1e-4)
+        stage_cost = self.stage_cost.squeeze()
+        _, indices = torch.topk(stage_cost, k=self.common_num, largest=False)
+        indices = indices.cpu()  
+        selected_clusters = cluster_ids_x[indices]
+        counts = torch.bincount(selected_clusters, minlength=num_clusters)
+        most_common_cluster = torch.argmax(counts).item()
+        epsilon = get_all_dq_seq(robot1_acc_explore_seq, robot2_acc_explore_seq)
+        
+        min_type = most_common_cluster
+        selected_indices = (cluster_ids_x == min_type).nonzero().squeeze()
+        selected_stage_cost = self.stage_cost[selected_indices]
+        selected_epsilon = epsilon[selected_indices]
+        selected_batch_size = selected_indices.size(0)
+        w_epsilon = compute_weights_k(selected_epsilon, selected_stage_cost, selected_batch_size, self.param_lambda)
+        w_epsilon = self.moving_average_filter(w_epsilon, int(self.mppi_T))
+
+        self.current_mppi_result = w_epsilon + self.last_mppi_result
+        self.current_mppi_result = torch.clamp(self.current_mppi_result, torch.cat((self.gpu_robot1_dq_min, self.gpu_robot2_dq_min)), torch.cat((self.gpu_robot1_dq_max, self.gpu_robot2_dq_max)))           # ----------------- Added: record pre/post SG for second MPPI -----------------
+        try:
+            pre_np = self.current_mppi_result.detach().cpu().numpy()
+            post_np = self._apply_sg_filter(pre_np)
+            self._save_mppi2_sg_log(pre_np, post_np)
+        except Exception as e:
+            print(f"[warn] SG logging failed: {e}")
+        self.mppi_result_modefied()
+        self.last_mppi_result = self.current_mppi_result
+        return self.current_mppi_result, min_energy
+    
+    def mppi_worker2(self):
+        # init ur3 dual quaternion modelwa
+        last_u=(self.current_mppi_result[0]).cpu().numpy()
+        self.robot1_q_temp = self.robot1_q
+        self.robot2_q_temp = self.robot2_q
+        self.batch_fake_robot1_q = torch.tensor(self.robot1_q_temp, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        self.batch_fake_robot2_q = torch.tensor(self.robot2_q_temp, device=self.device, dtype=self.dtype).repeat(self.batch_size, 1)
+        batch_last_mppi_result = self.last_mppi_result.repeat(self.batch_size, 1, 1)
+        robot1_acc_explore_seq, robot2_acc_explore_seq = epsilon_generator_log(int(self.batch_size), self.robot1_q_num, self.robot2_q_num, self.mppi_T,
+                                                                               self.mean, self.an_std, self.log_std, self.mppi_dt*self.max_acc_abs_value, self.mppi_seed)
+        batch_last_robot1_mppi_result = batch_last_mppi_result[:,:,:self.robot1_q_num]
+        batch_last_robot2_mppi_result = batch_last_mppi_result[:,:, self.robot1_q_num:]
+        batch_robot1_dq_seq = robot1_acc_explore_seq + batch_last_mppi_result[:,:,:self.robot1_q_num]
+        batch_robot2_dq_seq = robot2_acc_explore_seq + batch_last_mppi_result[:,:, self.robot1_q_num:]
+        self.last_batch_fake_robot1_q = self.batch_fake_robot1_q.clone()
+        self.last_batch_fake_robot2_q = self.batch_fake_robot2_q.clone()
+        self.first_batch_fake_robot1_q = self.batch_fake_robot1_q.clone()
+        self.first_batch_fake_robot2_q = self.batch_fake_robot2_q.clone()
+        self.stage_cost = torch.zeros(self.batch_size, 1, dtype = self.dtype, device = self.device)
+        for i in range(self.mppi_T):
+            if i == 0:
+                rel_pos, bacth_abs_pos, bacth_rel_jacobian, batch_abs_position, batch_angle = rel_abs_pose_rel_jac(self.gpu_robot1_dh_mat, self.gpu_robot2_dh_mat,
+                                                     self.batch_robot1_base,  self.batch_robot2_base, 
+                                                     self.batch_robot1_effector, self.batch_robot2_effector, 
+                                                     self.batch_fake_robot1_q, self.batch_fake_robot2_q,
+                                                     self.batch_line_d, self.batch_quat_line_ref, self.robot1_q_num, self.robot2_q_num, self.robot1_dh_type, self.robot2_dh_type)
+                bacth_rel_jacobian_null =  get_rel_jacobian_null(bacth_rel_jacobian, self.robot1_q_num, self.robot2_q_num, self.batch_size)
+
+            batch_robot1_ith_dq, batch_robot2_ith_dq = get_current_vel(batch_robot1_dq_seq, batch_robot2_dq_seq, i)
+
+            batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq = get_proj_qd(batch_robot1_ith_dq, batch_robot2_ith_dq, 
+                                                                             self.robot1_q_num, self.robot2_q_num, bacth_rel_jacobian_null)
+            last_batch_robot1_mppi_proj, last_batch_robot2_mppi_proj = get_proj_qd(batch_last_robot1_mppi_result[:,i,:], batch_last_robot2_mppi_result[:,i,:], 
+                                                                             self.robot1_q_num, self.robot2_q_num, bacth_rel_jacobian_null)
+            batch_robot1_ith_proj_dq = torch.clamp(batch_robot1_ith_proj_dq, self.gpu_robot1_dq_min, self.gpu_robot1_dq_max)
+            batch_robot2_ith_proj_dq = torch.clamp(batch_robot2_ith_proj_dq, self.gpu_robot2_dq_min, self.gpu_robot2_dq_max)
+            self.last_batch_fake_robot1_q = self.batch_fake_robot1_q
+            self.last_batch_fake_robot2_q = self.batch_fake_robot2_q
+            # update fake joint position
+            self.batch_fake_robot1_q, self.batch_fake_robot2_q, batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq=update_joint_position_with_limits(self.batch_fake_robot1_q, self.batch_fake_robot2_q, 
+                                        batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq,
+                                        self.gpu_robot1_q_min, self.gpu_robot1_q_max, 
+                                        self.gpu_robot2_q_min, self.gpu_robot2_q_max, self.mppi_dt)
+            robot1_acc_explore_seq[:,i,:self.robot1_q_num] = batch_robot1_ith_proj_dq- last_batch_robot1_mppi_proj
+            robot2_acc_explore_seq[:,i,:self.robot2_q_num] = batch_robot2_ith_proj_dq- last_batch_robot2_mppi_proj
+            robot1_acc_explore_seq[:,i,:self.robot1_q_num] = torch.clamp(robot1_acc_explore_seq[:,i,:self.robot1_q_num], self.mppi_dt*self.gpu_robot1_ddq_min, self.mppi_dt*self.gpu_robot1_ddq_max)
+            robot2_acc_explore_seq[:,i,:self.robot2_q_num] = torch.clamp(robot2_acc_explore_seq[:,i,:self.robot2_q_num], self.mppi_dt*self.gpu_robot2_ddq_min, self.mppi_dt*self.gpu_robot2_ddq_max)
+            
+            rel_pos, bacth_abs_pos, bacth_rel_jacobian, batch_abs_position, batch_angle = rel_abs_pose_rel_jac(self.gpu_robot1_dh_mat, self.gpu_robot2_dh_mat,
+                                                     self.batch_robot1_base,  self.batch_robot2_base, 
+                                                     self.batch_robot1_effector, self.batch_robot2_effector, 
+                                                     self.batch_fake_robot1_q, self.batch_fake_robot2_q,
+                                                     self.batch_line_d, self.batch_quat_line_ref, self.robot1_q_num, self.robot2_q_num, self.robot1_dh_type, self.robot2_dh_type)
+            bacth_rel_jacobian_null =  get_rel_jacobian_null(bacth_rel_jacobian, self.robot1_q_num, self.robot2_q_num, self.batch_size)
+            abs_cost = get_abs_cost(self.batch_desire_abs_pose, bacth_abs_pos, self.batch_desire_abs_position, batch_abs_position, self.abs_weight, self.abs_position_weight)
+            vel_cost = get_vel_cost(batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq, self.q_vel_weight)
+            tilt_constraint_cost = get_tilt_constraint_cost(batch_angle, self.batch_max_abs_tilt_angle, self.tilt_constraint_weight)
+            acc_cost = get_acc_cost(batch_robot1_ith_proj_dq, batch_robot2_ith_proj_dq, batch_last_mppi_result, self.robot1_q_num, self.robot2_q_num, i, self.q_acc_weight)
+            collision_cost = self.get_collision_cost(self.collision_constraint_weight)
+            self.stage_cost += (abs_cost + vel_cost+ collision_cost + acc_cost + tilt_constraint_cost)
+        joint_change = torch.square(self.first_batch_fake_robot1_q-self.batch_fake_robot1_q).sum(dim=1, keepdim=True)+torch.square(self.first_batch_fake_robot2_q-self.batch_fake_robot2_q).sum(dim=1, keepdim=True)
+        abs_terminal_cost = get_abs_cost(self.batch_desire_abs_pose, bacth_abs_pos, self.batch_desire_abs_position, batch_abs_position, self.terminal_abs_weight, self.terminal_abs_position_weight)
+        self.stage_cost += abs_terminal_cost + 0.01*joint_change
+        min_energy = self.stage_cost.min()
+        epsilon = get_all_dq_seq(robot1_acc_explore_seq, robot2_acc_explore_seq)
+        w_epsilon = compute_weights(epsilon, self.stage_cost, self.batch_size, self.param_lambda)
+        w_epsilon = self.moving_average_filter(w_epsilon, int(self.mppi_T))
+        self.current_mppi_result = w_epsilon + self.last_mppi_result
+        # constraints
+        self.current_mppi_result = torch.clamp(self.current_mppi_result, torch.cat((self.gpu_robot1_dq_min, self.gpu_robot2_dq_min)), torch.cat((self.gpu_robot1_dq_max, self.gpu_robot2_dq_max)))
+        self.mppi_result_modefied()
+
+
+        # ---------------------------------------------------------------------------
+
+        self.last_mppi_result[:-1,:] = self.current_mppi_result[1:,:]
+        self.last_mppi_result[-1,:] = self.current_mppi_result[-1,:]
+        return self.current_mppi_result, min_energy
+    
+    def traditional_control_result(self):
+        dual_arm_joint_pos = np.concatenate((self.robot1_q, self.robot2_q))
+        energy = 0
+        for i in range(self.mppi_T):
+            dual_arm_abs_feedback = vec8(self.cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos))
+            dual_arm_rel_feedback = vec8(self.cpu_dq_dual_arm_model.relative_pose(dual_arm_joint_pos))
+            dual_arm_rel_error = self.cpu_desire_rel_pose - dual_arm_rel_feedback
+            dual_arm_abs_error = self.cpu_desire_abs_pose - dual_arm_abs_feedback
+            dual_arm_rel_jacobian = self.cpu_dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
+            dual_arm_rel_jacobian_roboust_inv = dual_arm_rel_jacobian.T @ np.linalg.pinv(np.matmul(dual_arm_rel_jacobian, dual_arm_rel_jacobian.T) + 0.0000001 * np.eye(8))
+            # abs control
+            dual_arm_abs_jacobian = self.cpu_dq_dual_arm_model.absolute_pose_jacobian(dual_arm_joint_pos)
+            dual_arm_abs_feedback = vec8(self.cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos))
+            dual_arm_abs_refer = vec8(DQ(self.desire_abs_pose).normalize())
+            dual_arm_abs_error = dual_arm_abs_refer - dual_arm_abs_feedback
+            dual_arm_abs_jacobian_roboust_inv = dual_arm_abs_jacobian.T @ np.linalg.pinv(np.matmul(dual_arm_abs_jacobian, dual_arm_abs_jacobian.T) + 0.0000001 * np.eye(8))
+            dual_arm_abs_joint_vel = self.high_abs_gain * np.matmul(dual_arm_abs_jacobian_roboust_inv, (dual_arm_abs_error))
+            # null space control
+            dual_arm_joint_vel = np.matmul(np.eye(self.robot1_q_num+self.robot2_q_num)-dual_arm_rel_jacobian_roboust_inv@(dual_arm_rel_jacobian), dual_arm_abs_joint_vel)
+            dual_arm_joint_vel = np.clip(dual_arm_joint_vel, -0.3, 0.3)           
+            if i == 0:
+                dual_arm_return = dual_arm_joint_vel 
+            dual_arm_joint_pos +=  self.mppi_dt * dual_arm_joint_vel
+            dual_arm_abs_feedback = self.cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos)
+            abs_cost = self.abs_weight* np.linalg.norm(dual_arm_abs_refer - vec8(dual_arm_abs_feedback))
+            abs_pose_p = dual_arm_abs_feedback.P()
+            abs_pose_d = dual_arm_abs_feedback.D()
+            abs_position = (2*abs_pose_d*abs_pose_p.conj())
+            current_l_quat = abs_pose_p*self.cpu_desire_line_d*abs_pose_p.conj()
+            current_l_quat = current_l_quat.normalize()
+            self.cpu_desire_quat_line_ref = self.cpu_desire_quat_line_ref.normalize()
+            angle = 57.2958*math.acos(vec4(current_l_quat).dot(vec4(self.cpu_desire_quat_line_ref)))
+            if abs(angle) > self.max_abs_tilt_angle:
+                tilt_cost = 1*self.tilt_constraint_weight
+            else:
+                tilt_cost = 0
+            desire_abs_position = [0,self.desire_abs_position[0],self.desire_abs_position[1],self.desire_abs_position[2]]
+            abs_position_cost = self.abs_position_weight * np.linalg.norm(desire_abs_position - vec4(abs_position))
+            dual_arm_joint_pos_cuda = torch.from_numpy(dual_arm_joint_pos).view(1, (self.robot1_q_num+self.robot2_q_num)).cuda().float()
+            d_world, d_self = self.curobo_fn2.get_world_self_collision_distance_from_joints(dual_arm_joint_pos_cuda)
+            d_new = d_world + d_self
+            d_new[d_new!=0] = self.collision_constraint_weight
+            energy += abs_cost + abs_position_cost + d_new + tilt_cost
+        terminal_abs_cost = self.terminal_abs_weight * np.linalg.norm(dual_arm_abs_refer - vec8(dual_arm_abs_feedback))
+        terminal_abs_position_cost = self.terminal_abs_position_weight * np.linalg.norm(desire_abs_position - vec4(abs_position))
+        energy += terminal_abs_cost + terminal_abs_position_cost +tilt_cost
+        return  dual_arm_return, energy
+
+    def get_cost(self, sequence):
+        dual_arm_joint_pos = np.concatenate((self.robot1_q, self.robot2_q))
+        energy = 0
+        for i in range(self.mppi_T):
+            dual_arm_abs_feedback = vec8(self.cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos))
+            dual_arm_rel_feedback = vec8(self.cpu_dq_dual_arm_model.relative_pose(dual_arm_joint_pos))
+            dual_arm_abs_error = self.cpu_desire_abs_pose - dual_arm_abs_feedback
+            dual_arm_rel_jacobian = self.cpu_dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
+            dual_arm_rel_jacobian_roboust_inv = dual_arm_rel_jacobian.T @ np.linalg.pinv(np.matmul(dual_arm_rel_jacobian, dual_arm_rel_jacobian.T) + 0.0000001 * np.eye(8))
+            # abs control
+            dual_arm_abs_feedback = vec8(self.cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos))
+            dual_arm_abs_refer = vec8(DQ(self.desire_abs_pose).normalize())
+            dual_arm_abs_joint_vel = sequence[i].cpu().numpy()
+            # null space control
+            dual_arm_joint_vel = np.matmul(np.eye(self.robot1_q_num+self.robot2_q_num)-dual_arm_rel_jacobian_roboust_inv@(dual_arm_rel_jacobian), dual_arm_abs_joint_vel)      
+            dual_arm_joint_pos +=  self.mppi_dt * dual_arm_joint_vel
+            dual_arm_abs_feedback = self.cpu_dq_dual_arm_model.absolute_pose(dual_arm_joint_pos)
+            abs_cost = self.abs_weight* np.linalg.norm(dual_arm_abs_refer - vec8(dual_arm_abs_feedback))
+            abs_pose_p = dual_arm_abs_feedback.P()
+            abs_pose_d = dual_arm_abs_feedback.D()
+            abs_position = (2*abs_pose_d*abs_pose_p.conj())
+            current_l_quat = abs_pose_p*self.cpu_desire_line_d*abs_pose_p.conj()
+            angle = 57.2958*math.acos(vec4(current_l_quat).dot(vec4(self.cpu_desire_quat_line_ref)))
+            if abs(angle) > self.max_abs_tilt_angle:
+                tilt_cost = 1*self.tilt_constraint_weight
+            else:
+                tilt_cost = 0
+            desire_abs_position = [0,self.desire_abs_position[0],self.desire_abs_position[1],self.desire_abs_position[2]]
+            abs_position_cost = self.abs_position_weight * np.linalg.norm(desire_abs_position - vec4(abs_position))
+            dual_arm_joint_pos_cuda = torch.from_numpy(dual_arm_joint_pos).view(1, (self.robot1_q_num+self.robot2_q_num)).cuda().float()
+            d_world, d_self = self.curobo_fn2.get_world_self_collision_distance_from_joints(dual_arm_joint_pos_cuda)
+            d_new = d_world + d_self
+            d_new[d_new!=0] = self.collision_constraint_weight
+            energy += abs_cost + abs_position_cost + d_new + tilt_cost
+        terminal_abs_cost = self.terminal_abs_weight * np.linalg.norm(dual_arm_abs_refer - vec8(dual_arm_abs_feedback))
+        terminal_abs_position_cost = self.terminal_abs_position_weight * np.linalg.norm(desire_abs_position - vec4(abs_position))
+        energy += terminal_abs_cost + terminal_abs_position_cost +tilt_cost
+        return  energy
+    
+    def mppi_result_modefied(self):
+        dual_arm_joint_pos = np.concatenate((self.robot1_q, self.robot2_q))
+        for i in range(self.mppi_T):
+            dual_arm_rel_feedback = vec8(self.cpu_dq_dual_arm_model.relative_pose(dual_arm_joint_pos))
+            dual_arm_rel_error = self.cpu_desire_rel_pose - dual_arm_rel_feedback
+            dual_arm_rel_jacobian = self.cpu_dq_dual_arm_model.relative_pose_jacobian(dual_arm_joint_pos)
+            dual_arm_rel_jacobian_roboust_inv = dual_arm_rel_jacobian.T @ np.linalg.pinv(np.matmul(dual_arm_rel_jacobian, dual_arm_rel_jacobian.T) + 0.0000001 * np.eye(8))
+            dual_arm_rel_joint_vel = self.high_rel_gain * np.matmul(dual_arm_rel_jacobian_roboust_inv, dual_arm_rel_error)
+            current_mppi_vel = self.current_mppi_result[i,:].cpu().numpy()
+            dual_arm_guide_joint_vel = np.matmul(np.eye(self.robot1_q_num+self.robot2_q_num)-dual_arm_rel_jacobian_roboust_inv@(dual_arm_rel_jacobian), current_mppi_vel)
+            dual_arm_joint_vel = dual_arm_rel_joint_vel + dual_arm_guide_joint_vel
+            self.current_mppi_result[i,:] = torch.tensor(dual_arm_joint_vel, device=self.device, dtype=self.dtype)
+            dual_arm_joint_pos += self.mppi_dt*dual_arm_joint_vel
+
+    def update_c(self, mppi_energy, p_energy):
+        flag = False
+        c_add = self.mppi_dt*(p_energy / mppi_energy - self.c_eta)
+        self.c += c_add
+        self.c = max(-0.05, min(self.c, 0.4))
+        if self.c < 0:
+            flag = True
+        return flag
+    
+    def warm_up(self):
+        for i in range(10):
+            self.update_joint_states()
+            mppi_u0, mppi_energy = self.mppi_worker()
+            _, _ = self.mppi_worker2()
+            p_u0, p_energy = self.traditional_control_result()
+            mppi_u0 = mppi_u0.cpu().numpy()
+            flag = self.update_c(mppi_energy, p_energy)
+        self.last_mppi_result = torch.zeros(self.mppi_T, (self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
+        self.current_mppi_result = torch.zeros(self.mppi_T, (self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
+        self.first_element_mppi_result = torch.zeros((self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
+        self.c = 0.0
+        self.start_time = time.time()
+        
+    def warm_up2(self):
+        for i in range(10):
+            self.update_joint_states()
+            _, mppi_energy = self.mppi_worker()
+            mppi_u, _ = self.mppi_worker2()
+            p_u0, p_energy = self.traditional_control_result()
+            mppi_u0 = mppi_u[0].cpu().numpy()
+            flag = self.update_c(mppi_energy, p_energy)
+        self.c = 0.0
+        self.start_time = time.time()
+
+    def play_once(self):
+        self.update_joint_states()
+        _, mppi_energy = self.mppi_worker()
+        mppi_u, _ = self.mppi_worker2()
+        p_u0, p_energy = self.traditional_control_result()
+        print("mppi_energy: ", mppi_energy)
+        print("p_energy: ", p_energy)
+        mppi_u0 = mppi_u[0].cpu().numpy()
+        flag = self.update_c(mppi_energy, p_energy)
+        print(self.c)
+        if(flag ==True):
+            u0 = p_u0
+            self.last_mppi_result = torch.zeros(self.mppi_T, (self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
+            self.current_mppi_result = torch.zeros(self.mppi_T, (self.robot1_q_num+self.robot2_q_num), device=self.device, dtype=self.dtype)
+        else:
+            u0 =mppi_u0
+        u0 = u0.tolist()
+        self.ros_module.write_high_u(u0)
+
+# ---------------- Original helper functions (unchanged) ----------------
+@torch.jit.script
+def update_joint_position_with_limits(batch_robot1_q:torch.Tensor, batch_robot2_q:torch.Tensor, 
+                          batch_robot1_dq:torch.Tensor, batch_robot2_dq:torch.Tensor,
+                          robot1_joint_min:torch.Tensor, robot1_joint_max:torch.Tensor,
+                          robot2_joint_min:torch.Tensor, robot2_joint_max:torch.Tensor, dt:float):
+    updated_robot1_q = batch_robot1_q + batch_robot1_dq * dt
+    updated_robot2_q = batch_robot2_q + batch_robot2_dq * dt
+    clamped_robot1_q = torch.clamp(updated_robot1_q, robot1_joint_min, robot1_joint_max)
+    clamped_robot2_q = torch.clamp(updated_robot2_q, robot2_joint_min, robot2_joint_max)
+    allowed_robot1_dq = (clamped_robot1_q - batch_robot1_q) / dt
+    allowed_robot2_dq = (clamped_robot2_q - batch_robot2_q) / dt
+    return clamped_robot1_q, clamped_robot2_q, allowed_robot1_dq, allowed_robot2_dq
+
+@torch.jit.script   
+def update_fake_joint_pos(batch_fake_robot1_q:torch.Tensor, batch_fake_robot2_q:torch.Tensor, 
+                          batch_robot1_qd:torch.Tensor, batch_robot2_qd:torch.Tensor, dt:float):
+    last_batch_fake_robot1_q = batch_fake_robot1_q.clone()
+    last_batch_fake_robot2_q = batch_fake_robot2_q.clone()
+    batch_fake_robot1_q = dt * batch_robot1_qd + batch_fake_robot1_q
+    batch_fake_robot2_q = dt * batch_robot2_qd + batch_fake_robot2_q
+    return last_batch_fake_robot1_q, last_batch_fake_robot2_q, batch_fake_robot1_q, batch_fake_robot2_q
+
+@torch.jit.script    
+def compute_weights_k(epsilon: torch.Tensor, S: torch.Tensor, batch_size:int, p_lamada: float) -> torch.Tensor:
+    w = torch.zeros(batch_size, device=S.device, dtype= S.dtype)
+    rho = S.min()
+    eta = torch.sum(torch.exp((-1.0 / p_lamada) * (S - rho)))
+    while eta < 15 or eta > 20:
+        if eta > 20:
+            p_lamada *= 0.8
+        else:
+            p_lamada *= 1.2
+        eta = torch.sum(torch.exp((-1.0 / p_lamada) * (S - rho)))
+    w = (1.0 / eta) * torch.exp((-1.0 / p_lamada) * (S - rho))
+    w_epsilon = torch.sum(w.view(batch_size, 1, 1) * epsilon, dim=0)
+    return w_epsilon
+
+@torch.jit.script    
+def compute_weights(epsilon: torch.Tensor, S: torch.Tensor, batch_size:int, p_lamada: float) -> torch.Tensor:
+    w = torch.zeros(batch_size, device=S.device, dtype= S.dtype)
+    rho = S.min()
+    eta = torch.sum(torch.exp((-1.0 / p_lamada) * (S - rho)))
+    while eta < 22 or eta > 30:
+        if eta > 30:
+            p_lamada *= 0.8
+        else:
+            p_lamada *= 1.2
+        eta = torch.sum(torch.exp((-1.0 / p_lamada) * (S - rho)))
+    w = (1.0 / eta) * torch.exp((-1.0 / p_lamada) * (S - rho))
+    w_epsilon = torch.sum(w.view(batch_size, 1, 1) * epsilon, dim=0)
+    return w_epsilon
+
+@torch.jit.script
+def get_proj_qd(batch_robot1_qd:torch.Tensor, batch_robot2_qd:torch.Tensor, 
+                robot1_q_num:int, robot2_q_num:int, batch_null_space_mat:torch.Tensor):
+    batch_two_robot_qd = torch.cat((batch_robot1_qd.unsqueeze(2),  batch_robot2_qd.unsqueeze(2)), dim=1)
+    batch_null_space_mat_first = batch_null_space_mat[:, :robot1_q_num, :]
+    batch_null_space_mat_last = batch_null_space_mat[:,  robot1_q_num:, :]
+    batch_robot1_proj_qd = torch.matmul(batch_null_space_mat_first, batch_two_robot_qd).squeeze(2)
+    batch_robot2_proj_qd  = torch.matmul(batch_null_space_mat_last, batch_two_robot_qd).squeeze(2)  
+    return batch_robot1_proj_qd, batch_robot2_proj_qd
+
+@torch.jit.script
+def get_current_vel(robot1_dq_seq: torch.Tensor, robot2_dq_seq: torch.Tensor, i: int):
+    robot1_dq = robot1_dq_seq[:, i, :]
+    robot2_dq = robot2_dq_seq[:, i, :]
+    return robot1_dq, robot2_dq
+
+@torch.jit.script
+def get_all_q(batch_robot1_q:torch.Tensor, batch_robot2_q:torch.Tensor):
+    return torch.cat((batch_robot1_q, batch_robot2_q), dim=1)
+
+@torch.jit.script
+def get_all_dq_seq(batch_robot1_dq_rollout_seq:torch.Tensor, batch_robot2_dq_rollout_seq:torch.Tensor):
+    return torch.cat((batch_robot1_dq_rollout_seq, batch_robot2_dq_rollout_seq), dim=2)
+
+# @torch.jit.script
+
+def get_abs_cost(desire_abs_pos:torch.Tensor, abs_pos:torch.Tensor, desire_abs_position:torch.Tensor, abs_position:torch.Tensor, rot_weight:float, position_weight:float):
+    quat_difference = rot_weight*torch.abs(desire_abs_pos - abs_pos)
+    position_difference = position_weight*torch.abs(desire_abs_position -  abs_position)
+    result = quat_difference.sum(dim=1, keepdim=True) + position_difference.sum(dim=1, keepdim=True)
+    return result
+
+@torch.jit.script
+def get_vel_cost(batch_robot1_dq:torch.Tensor, batch_robot2_dq:torch.Tensor, weight:float):
+    difference = torch.abs(batch_robot1_dq) + torch.abs(batch_robot2_dq)
+    result = weight * difference.sum(dim=1, keepdim=True)    
+    return result
+
+@torch.jit.script
+def get_vel_constraint_cost(batch_robot1_dq:torch.Tensor, batch_robot2_dq:torch.Tensor,
+                            batch_robot1_dq_min:torch.Tensor, batch_robot1_dq_max:torch.Tensor,
+                            batch_robot2_dq_min:torch.Tensor, batch_robot2_dq_max:torch.Tensor,
+                            weight:float):
+    robot1_violation_min = (batch_robot1_dq < batch_robot1_dq_min).float()
+    robot1_violation_max = (batch_robot1_dq > batch_robot1_dq_max).float()
+    robot2_violation_min = (batch_robot2_dq < batch_robot2_dq_min).float()
+    robot2_violation_max = (batch_robot2_dq > batch_robot2_dq_max).float()
+    total_violations = robot1_violation_min + robot1_violation_max + robot2_violation_min + robot2_violation_max
+    total_cost = weight * total_violations.sum(dim=1, keepdim=True)
+    return total_cost          
+             
+@torch.jit.script
+def get_pos_constraint_cost(batch_robot1_q:torch.Tensor, batch_robot2_q:torch.Tensor,
+                            batch_robot1_q_min:torch.Tensor, batch_robot1_q_max:torch.Tensor,
+                            batch_robot2_q_min:torch.Tensor, batch_robot2_q_max:torch.Tensor,
+                            weight:float):
+    robot1_violation_min = (batch_robot1_q < batch_robot1_q_min).float()
+    robot1_violation_max = (batch_robot1_q > batch_robot1_q_max).float()
+    robot2_violation_min = (batch_robot2_q < batch_robot2_q_min).float()
+    robot2_violation_max = (batch_robot2_q > batch_robot2_q_max).float()
+    total_violations = robot1_violation_min + robot1_violation_max + robot2_violation_min + robot2_violation_max
+    total_cost = weight * total_violations.sum(dim=1, keepdim=True)
+    return total_cost
+
+@torch.jit.script
+def get_tilt_constraint_cost(angle:torch.Tensor, batch_max_abs_tilt_angle:torch.Tensor, weight:float):
+    robot1_violation_min = (angle < -batch_max_abs_tilt_angle).float()
+    robot1_violation_max = (angle > batch_max_abs_tilt_angle).float()
+    total_violations = robot1_violation_min + robot1_violation_max
+    total_cost = weight * total_violations.sum(dim=1, keepdim=True)
+    return total_cost
+
+@torch.jit.script
+def get_acc_cost(batch_robot1_dq:torch.Tensor, batch_robot2_dq:torch.Tensor, batch_last_mppi_result:torch.Tensor, 
+                 robot1_q_num:int, robot2_q_num:int, i:int, weight:float):
+    last_robot1_dq = batch_last_mppi_result[:, i, :robot1_q_num]
+    last_robot2_dq = batch_last_mppi_result[:, i, robot1_q_num:]
+    difference = torch.abs(batch_robot1_dq - last_robot1_dq) + torch.abs(batch_robot2_dq - last_robot2_dq)
+    result = weight * difference.sum(dim=1, keepdim=True)    
+    return result
+
+@torch.jit.script
+def get_rel_jacobian_null(jac_batch:torch.Tensor, robot1_q_num:int, robot2_q_num:int, batch_size: int):
+    batch_i = torch.eye(robot1_q_num+robot2_q_num, dtype=torch.float64, device= "cuda:0").repeat(batch_size, 1, 1)
+    batch_eps = 1e-16*torch.eye(8, dtype=torch.float64, device= "cuda:0").repeat(batch_size, 1, 1)
+    jac_batch = jac_batch.to(torch.float64)
+    jac_batch_t = jac_batch.transpose(-2, -1)
+    J_J_t  =  torch.matmul(jac_batch, jac_batch_t)
+    J_pinv = jac_batch_t@torch.inverse(J_J_t + batch_eps)
+    J_pinv_J = torch.matmul(J_pinv, jac_batch)
+    rel_jacobian_null = batch_i - J_pinv_J
+    return rel_jacobian_null.to(torch.float32)
+
+@torch.jit.script
+def epsilon_generator(batch_size: int, robot1_q_num: int, robot2_q_num: int, 
+                      mppi_T: int, mean: float, std: float, max_abs_value: float, mppi_seed:int):
+    torch.manual_seed(mppi_seed)
+    total_q_num = robot1_q_num + robot2_q_num
+    data = torch.randn(batch_size, mppi_T, total_q_num, dtype=torch.float32, device="cuda:0")
+    data = data * std + mean
+    data = torch.clamp(data, min=-max_abs_value, max=max_abs_value)
+    part1, part2 = data.split([robot1_q_num, robot2_q_num], dim=2)
+    return part1, part2
+
+@torch.jit.script
+def epsilon_generator_log(batch_size: int, robot1_q_num: int, robot2_q_num: int, 
+                          mppi_T: int, mean: float, std: float, log_std: float, max_abs_value: float, mppi_seed:int):
+    total_q_num = robot1_q_num + robot2_q_num
+    torch.manual_seed(mppi_seed)
+    data = torch.randn(batch_size, mppi_T, total_q_num, dtype=torch.float32, device="cuda:0")
+    torch.manual_seed(mppi_seed)
+    log_normal_data = torch.exp(torch.randn(batch_size, mppi_T, total_q_num, dtype=torch.float32, device="cuda:0") * log_std)
+    combined_data = data * log_normal_data
+    combined_data = combined_data * std + mean
+    combined_data = torch.clamp(combined_data, min=-max_abs_value, max=max_abs_value)
+    part1, part2 = combined_data.split([robot1_q_num, robot2_q_num], dim=2)
+    return part1, part2
+
+@torch.jit.script
+def epsilon_generator_colored(
+    batch_size: int, 
+    robot1_q_num: int, 
+    robot2_q_num: int,
+    mppi_T: int, 
+    mean: float, 
+    std: float, 
+    gamma: float,  # 新增参数：频谱衰减指数
+    max_abs_value: float, 
+    mppi_seed: int
+):
+    total_q_num = robot1_q_num + robot2_q_num
+    device = "cuda:0"
+    T = mppi_T
+    N = T // 2 + 1
+    f_min = 1.0 / N
+    n_range = torch.arange(1, N-1, device=device, dtype=torch.float32)
+    sum_term = 4 * torch.sum(torch.pow(n_range, -gamma))
+    zeta = (T**-2) * (N**gamma) * (1 + sum_term)
+    torch.manual_seed(mppi_seed)
+    real_part = torch.randn(batch_size, total_q_num, N, device=device)
+    torch.manual_seed(mppi_seed)
+    imag_part = torch.randn(batch_size, total_q_num, N, device=device) if T % 2 != 0 else torch.zeros(batch_size, total_q_num, N, device=device)
+    freq_indices = torch.arange(N, device=device).float()
+    scaled_freq = torch.clamp_min(freq_indices / N, f_min)
+    variance = (scaled_freq ** (-gamma)) * (std**2) / zeta
+    real_part *= torch.sqrt(variance)
+    imag_part *= torch.sqrt(variance) if T % 2 != 0 else torch.zeros_like(imag_part)
+    full_spectrum = torch.zeros(batch_size, total_q_num, T, dtype=torch.complex64, device=device)
+    full_spectrum[..., :N] = torch.complex(real_part, imag_part)
+    if T % 2 == 0:
+        full_spectrum[..., N:] = torch.conj(torch.flip(full_spectrum[..., 1:N-1], dims=[-1]))
+    else:
+        full_spectrum[..., N:] = torch.conj(torch.flip(full_spectrum[..., 1:N], dims=[-1]))
+    time_domain = torch.fft.ifft(full_spectrum, n=T, norm="forward").real * T
+    noise = time_domain.permute(0, 2, 1)
+    noise = noise * std + mean
+    noise = torch.clamp(noise, -max_abs_value, max_abs_value)
+    part1, part2 = noise.split([robot1_q_num, robot2_q_num], dim=2)
+    return part1, part2
+
+
+

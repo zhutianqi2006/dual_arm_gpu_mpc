@@ -79,7 +79,7 @@
     <child link="left_panda_fr3_hand"/>
   </joint>
   <joint name="left_panda_root_joint" type="fixed">
-    <origin xyz="-0.035 0.75 0.07" rpy="0. 0. -1.5707964"/>
+    <origin xyz="0.035 0.75 0.07" rpy="0. 0. -1.5707964"/>
     <parent link="Root"/>
     <child link="left_panda_fr3_link0"/>
   </joint>
@@ -162,7 +162,7 @@
     <child link="right_panda_fr3_hand"/>
   </joint>
   <joint name="right_panda_root_joint" type="fixed">
-    <origin xyz="-0.035 -0.75 0.07" rpy="0. 0. 1.5707963"/>
+    <origin xyz="0.035 -0.75 0.07" rpy="0. 0. 1.5707963"/>
     <parent link="Root"/>
     <child link="right_panda_fr3_link0"/>
   </joint>

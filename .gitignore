@@ -64,6 +64,7 @@ __pypackages__/
 # Environments
 .env
 .venv
+.worktrees/
 env/
 venv/
 ENV/
@@ -106,4 +107,3 @@ octave-workspace
 simulink_ros_plot/*.fig
 simulink_ros_plot/*.mat
 simulink_ros_plot/*.svg
-

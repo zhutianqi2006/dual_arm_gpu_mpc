@@ -1,0 +1,30 @@
+# Bootstrap environment for dual_arm_gpu_mpc.
+# You still need to install a CUDA-enabled PyTorch build, then install
+# cuda_dq_kernel and curobo from local source, and install ROS 2 separately
+# if you need online robot control.
+name: dual-arm-gpu
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - git
+  - git-lfs
+  - cmake
+  - ninja
+  - numpy
+  - scipy
+  - pyyaml
+  - networkx
+  - trimesh
+  - scikit-image
+  - tqdm
+  - pybind11
+  - importlib-resources
+  - pip:
+      - dqrobotics==23.4.0a22
+      - kmeans-pytorch
+      - numpy-quaternion
+      - yourdfpy>=0.0.60
+      - warp-lang>=1.12.1
+      - pytest

@@ -1,0 +1,54 @@
+[build-system]
+requires = [
+    "setuptools>=68",
+    "wheel>=0.45",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dual-arm-gpu-mpc"
+version = "0.1.0"
+description = "dual_arm_gpu_mpc application package and uv-managed environment"
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    "numpy>=1.26,<2",
+    "scipy>=1.15,<2",
+    "pyyaml>=5.4",
+    "dqrobotics==23.4.0a22",
+    "kmeans-pytorch",
+    "pybind11>=3,<4",
+    "setuptools>=68",
+    "setuptools-scm>=6.2",
+    "torch==2.9.1",
+    "torchvision==0.24.1",
+    "torchaudio==2.9.1",
+    "wheel>=0.45",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<9",
+]
+
+[tool.uv]
+package = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu126", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+    { index = "pytorch-cu126", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchaudio = [
+    { index = "pytorch-cu126", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true

@@ -2,76 +2,191 @@
   Dual Arm GPU Controller
 </h1>
 <p align="center">
-<p align="center">
   Dual Quaternion Dual-Arm Manipulator GPU Control
 </p>
 <p align="center">
-English | <a href="README_cn.md">简体中文</a> 
+English | <a href="README_cn.md">简体中文</a>
 </p>
 
-## Environment Setup
-Install curobo to achieve efficient parallel collision detection.
+## Overview
 
-1. Ensure pytorch >= 1.10 and cuda=11.8.
+This project uses:
 
-2. Clone the cuRobo repository.
-```sh
-git clone https://github.com/NVlabs/curobo
+- `dq_torch` under `cuda_dq_kernel` for batched dual-quaternion kinematics on CUDA
+- `curobo` for GPU collision checking
+- ROS 2 for online robot IO
+
+NVIDIA Isaac Sim is not required for this repository. For collision checking and the MPPI stack here, the Python library installation of `curobo` is enough.
+
+## Verified Baseline
+
+The setup below was verified locally with:
+
+- Ubuntu 22.04
+- Python 3.10.12
+- `uv 0.7.19`
+- PyTorch `2.9.1+cu126`
+- CUDA toolkit `12.6`
+- `curobo` installed from source with `pip install -e . --no-build-isolation`
+
+## Dependency Split
+
+It helps to think about the environment in three layers:
+
+1. CUDA + PyTorch
+   This is required for both `dq_torch` and `curobo`.
+2. Robotics Python dependencies
+   This includes `dqrobotics`, `kmeans-pytorch`, and the Python packages that `curobo` installs.
+3. ROS 2
+   This is required for the online controllers and ROS bridge modules such as `utils/high_ros_module.py`.
+
+## Recommended Setup With uv
+
+`dual_arm_gpu_mpc` now includes a project-local `uv` entry point:
+
+- [`pyproject.toml`](/home/echoz/2026_tro_dual_arm_code/dual_arm_gpu_mpc/pyproject.toml)
+- [`scripts/bootstrap_uv.sh`](/home/echoz/2026_tro_dual_arm_code/dual_arm_gpu_mpc/scripts/bootstrap_uv.sh)
+
+From `dual_arm_gpu_mpc/`:
+
+```bash
+cd dual_arm_gpu_mpc
+export CUDA_HOME=/usr/local/cuda-12.6
+uv sync
+bash scripts/bootstrap_uv.sh
 ```
-3. Follow the installation instructions for curobo and complete the setup.
+
+What this does:
+
+- `uv sync` creates the local `.venv` and installs the pure Python dependencies plus PyTorch `cu126`
+- `bootstrap_uv.sh` installs local source dependencies that still need builds:
+  - installs `dual_arm_gpu_mpc` itself in editable mode
+  - installs `../cuda_dq_kernel` as a local non-editable build so `dq_torch` is importable inside `.venv`
+  - installs `../../third_party/curobo` as an editable install if that directory exists
+
+If you change Python dependencies, run:
+
+```bash
+cd dual_arm_gpu_mpc
+uv lock
+uv sync
+```
+
+## Install `curobo` Without Isaac Sim
+
+`curobo`'s official installation guide explicitly supports library-only installation and states that Isaac Sim is not a required dependency:
 https://curobo.org/get_started/1_install_instructions.html
 
-4. Clone this repository.
-```sh
-cd cuda_dq_kernel
-```
-5. Compile and install the GPU kernel Python interface.
-```sh
-pip install .
-```
-6. Other requirements.
+Required preparation:
 
-ROS2
-```sh
+```bash
+sudo apt install git-lfs
+git lfs install
+```
+
+Clone and install:
+
+```bash
+git clone https://github.com/NVlabs/curobo.git third_party/curobo
+cd dual_arm_gpu_mpc
+export CUDA_HOME=/usr/local/cuda-12.6
+bash scripts/bootstrap_uv.sh
+```
+
+The local verification on this machine used a mixed strategy:
+
+- `dq_torch` is installed from local source as a non-editable build
+- `curobo` is installed editable with `--no-build-isolation`
+
+That split is intentional. `cuda_dq_kernel` currently works best as a non-editable local build for this workspace, while `curobo` works well as an editable source dependency.
+
+Useful note from the official docs:
+
+- `curobo` recommends Ubuntu 20.04 or 22.04 and Python 3.8-3.10
+- `git-lfs` should be installed before cloning
+- Isaac Sim is only needed for the Isaac Sim integration path, not for the library path
+
+## ROS 2 Requirement
+
+`dual_arm_gpu_mpc` imports `rclpy`, `sensor_msgs`, `std_msgs`, and `geometry_msgs` through the ROS bridge modules. If you only want to build `dq_torch` and test CUDA kernels offline, ROS 2 is not required. If you want to run the high-level controller, ROS 2 is required.
+
+Example for Ubuntu 22.04:
+
+```bash
 sudo apt install ros-humble-desktop
+source /opt/ros/humble/setup.bash
 ```
-Numpy
-```sh
-pip install numpy
-```
-kmeans-pytorch
-```sh
-pip install kmeans-pytorch
-```
-## Model Placement
-1. Place URDF and meshes in the `robot` folder.
-```sh
-github_source_code/curobo/src/curobo/content/assets/robot
-```
-2. The `content` folder contains robot and world configuration files.
-```sh
-github_source_code/curobo/src/curobo/content/configs
-```
-Place robot YAML files in the `robot` folder and environment YAML files in the `world` folder.
-## Running the Simulation
-In the `examples` folder,
-first run the simulation environment.
-```sh
-bullet_robot_ros.py
-```
-Then run the low-level controller.
-```sh
-low_level.py
-```
-Finally, run the high-level controller.
-```sh
-mppi_xxxxx.py
-```
-You can observe the motion in the bullet interface.
 
-## Reference Projects
-| Project | Link|
-| --------------------------| ------------------------------------------------------------------------------------- |
-| curobo| https://github.com/NVlabs/curobo  |
-| dq robotics | https://github.com/dqrobotics/cpp|
-|predictive-multi-agent-framework| https://github.com/riddhiman13/predictive-multi-agent-framework
+If `rclpy` is missing, modules such as `utils/mppi_adpan_module.py` and `utils/mppi_kmeans_adpan_module.py` will fail during import even if `curobo` is installed correctly.
+
+## Optional Conda Bootstrap
+
+A fallback [`environment.yml`](/home/echoz/2026_tro_dual_arm_code/dual_arm_gpu_mpc/environment.yml) is provided inside `dual_arm_gpu_mpc`. Run this from that directory:
+
+```bash
+cd dual_arm_gpu_mpc
+conda env create -f environment.yml
+conda activate dual-arm-gpu
+```
+
+That file is only a bootstrap environment. You still need to:
+
+- install a CUDA-enabled PyTorch build
+- build `cuda_dq_kernel`
+- install `curobo` from source
+- install ROS 2 separately if you need the online controller
+
+## Quick Verification
+
+Verify the CUDA extension:
+
+```bash
+cd cuda_dq_kernel
+python -m pytest tests/pytest/test_import_smoke.py -q
+python -m pytest tests/pytest/test_structure_refactor_smoke.py -q
+python -m pytest tests/pytest/test_mppi_project_step.py -q
+```
+
+Verify `curobo` core imports:
+
+```bash
+python - <<'PY'
+import curobo
+from curobo.types.base import TensorDeviceType
+from curobo.wrap.model.robot_world import RobotWorld, RobotWorldConfig
+print("curobo import ok")
+PY
+```
+
+## Project Layout
+
+This workspace now uses:
+
+- `cuda_dq_kernel` for the CUDA extension
+- `dual_arm_gpu_mpc/src/dual_arm_gpu_mpc` for the Python application package
+- `dual_arm_gpu_mpc/configs/{robot,world}` for project-local curobo configuration files
+- `dual_arm_gpu_mpc/analysis/matlab` for MATLAB analysis artifacts
+
+## Running The Simulation
+
+Inside `examples/`:
+
+1. start the simulation environment
+2. run the low-level controller
+3. run the high-level controller
+
+Representative commands:
+
+```bash
+python bullet_robot_ros.py
+python low_level.py
+python mppi_xxxxx.py
+```
+
+## References
+
+| Project | Link |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| curobo | https://github.com/NVlabs/curobo |
+| dq robotics | https://github.com/dqrobotics/cpp |
+| predictive-multi-agent-framework | https://github.com/riddhiman13/predictive-multi-agent-framework |

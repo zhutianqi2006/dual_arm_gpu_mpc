@@ -14,7 +14,7 @@ from dqrobotics.robot_modeling import (
 
 from dual_arm_gpu_mpc.config.loader import ConfigModule
 from dual_arm_gpu_mpc.controllers.high_level.mppi.common_ops import moving_average_filter_tensor
-from dual_arm_gpu_mpc.robotics.collision.curobo_loader import build_robot_world_pair
+from dual_arm_gpu_mpc.robotics.collision.curobo_loader import build_robot_world_pair, update_world_obstacle_pose
 
 
 class DualArmMPPICore:
@@ -102,6 +102,7 @@ class DualArmMPPICore:
 
         self.curobo_world_file = config.curobo_world_file
         self.curobo_robot_file = config.curobo_robot_file
+        self.dynamic_obstacle_name = getattr(config, "dynamic_obstacle_name", "")
         self.init_collision_model()
 
         from dual_arm_gpu_mpc.ros.high import HighROSModule
@@ -255,6 +256,27 @@ class DualArmMPPICore:
     def update_obstacle_velocity_estimate(self):
         pass
 
+    def sync_dynamic_obstacle(self):
+        if not self.dynamic_obstacle_name:
+            return
+
+        obstacle_position = getattr(self.ros_module, "dynamic_obstacle", None)
+        if obstacle_position is None or len(obstacle_position) < 3:
+            return
+
+        update_world_obstacle_pose(
+            self.curobo_fn,
+            self.dynamic_obstacle_name,
+            obstacle_position,
+            tensor_args=self.tensor_args,
+        )
+        update_world_obstacle_pose(
+            self.curobo_fn2,
+            self.dynamic_obstacle_name,
+            obstacle_position,
+            tensor_args=self.tensor_args,
+        )
+
     def get_collision_cost(self, weight: float):
         q = torch.cat((self.batch_fake_robot1_q, self.batch_fake_robot2_q), dim=1)
         q_mid = torch.cat(
@@ -305,6 +327,7 @@ class DualArmMPPICore:
     def warm_up(self):
         for _ in range(10):
             self.update_joint_states()
+            self.sync_dynamic_obstacle()
             mppi_u0, mppi_energy = self.mppi_worker()
             _, _ = self.mppi_worker2()
             p_u0, p_energy = self.traditional_control_result()
@@ -325,6 +348,7 @@ class DualArmMPPICore:
     def warm_up2(self):
         for _ in range(10):
             self.update_joint_states()
+            self.sync_dynamic_obstacle()
             mppi_u0, mppi_energy = self.mppi_worker()
             mppi_u, _ = self.mppi_worker2()
             p_u0, p_energy = self.traditional_control_result()
@@ -335,6 +359,7 @@ class DualArmMPPICore:
 
     def play_once(self):
         self.update_joint_states()
+        self.sync_dynamic_obstacle()
         self._before_play_once()
         _, mppi_energy = self.mppi_worker()
         mppi_u, _ = self.mppi_worker2()
@@ -357,3 +382,16 @@ class DualArmMPPICore:
         u0 = u0.tolist()
         self.ros_module.write_high_u(u0)
         self._after_play_once()
+
+    def shutdown(self, join_timeout: float = 1.0):
+        try:
+            import rclpy
+        except ImportError:
+            return
+
+        if rclpy.ok():
+            rclpy.shutdown()
+
+        ros_thread = getattr(self, "ros_thread", None)
+        if ros_thread is not None and ros_thread.is_alive() and ros_thread is not threading.current_thread():
+            ros_thread.join(timeout=join_timeout)

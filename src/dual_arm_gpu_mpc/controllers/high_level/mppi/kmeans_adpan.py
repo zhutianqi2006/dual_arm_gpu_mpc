@@ -525,4 +525,4 @@ class MPPIKmeansAdpAnModule(DualArmMPPICore):
         energy += terminal_abs_cost + terminal_abs_position_cost +tilt_cost
         return  energy
     
-# module-level helpers are provided by utils.mppi_common_ops.
+# module-level helpers are provided below to keep the policy self-contained.

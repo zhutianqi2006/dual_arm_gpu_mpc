@@ -78,6 +78,8 @@ class ConfigModule:
         self.manip_log_path = config_data.get('manip_log_path', None)
         self.curobo_world_file = config_data.get('curobo_world_file', 'franka_dynamic_exp3_env.yml')
         self.curobo_robot_file = config_data.get('curobo_robot_file', 'dual_panda_curobo_obstacle.yml')
+        self.dynamic_obstacle_name = config_data.get('dynamic_obstacle_name', '')
+        self.dynamic_obstacle_topic = config_data.get('dynamic_obstacle_topic', '/dock_position_world')
         # traditional control
         self.high_rel_gain = config_data.get('high_rel_gain', 0.1)
         self.high_abs_gain = config_data.get('high_abs_gain', 0.1)

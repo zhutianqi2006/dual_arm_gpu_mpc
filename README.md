@@ -38,7 +38,7 @@ It helps to think about the environment in three layers:
 2. Robotics Python dependencies
    This includes `dqrobotics`, `kmeans-pytorch`, and the Python packages that `curobo` installs.
 3. ROS 2
-   This is required for the online controllers and ROS bridge modules such as `utils/high_ros_module.py`.
+   This is required for the online controllers and ROS bridge modules under `src/dual_arm_gpu_mpc/ros/`.
 
 ## Recommended Setup With uv
 
@@ -117,7 +117,7 @@ sudo apt install ros-humble-desktop
 source /opt/ros/humble/setup.bash
 ```
 
-If `rclpy` is missing, modules such as `utils/mppi_adpan_module.py` and `utils/mppi_kmeans_adpan_module.py` will fail during import even if `curobo` is installed correctly.
+If `rclpy` is missing, ROS-backed modules such as `src/dual_arm_gpu_mpc/ros/high.py`, `src/dual_arm_gpu_mpc/ros/low.py`, and the MPPI entrypoints under `src/dual_arm_gpu_mpc/controllers/` will fail during import even if `curobo` is installed correctly.
 
 ## Optional Conda Bootstrap
 
@@ -171,17 +171,26 @@ This workspace now uses:
 
 Inside `examples/`:
 
+- `sim1_ur`: point-to-point motion without obstacle avoidance as the baseline task
+- `sim2_ur`: static obstacle avoidance
+- `sim3_ur`: dynamic obstacle avoidance with a moving obstacle in Bullet
+For each scenario, the usual process is:
+
 1. start the simulation environment
 2. run the low-level controller
 3. run the high-level controller
 
-Representative commands:
+Representative commands for `sim1_ur`:
 
 ```bash
-python bullet_robot_ros.py
-python low_level.py
-python mppi_xxxxx.py
+python examples/sim1_ur/bullet_robot_ros.py
+python examples/sim1_ur/low_level.py
+python examples/sim1_ur/mppi_kmeans_adpan.py
 ```
+
+Use three separate terminals and start them in that order. The same structure is available under `examples/sim2_ur`, `examples/sim3_ur`, and `examples/exp1_ur`.
+
+`examples/sim3_ur` is the dynamic-obstacle variant. Its Bullet scene includes a cuboid obstacle named `moving_obstacle` that travels back and forth along a fixed line while publishing its world-frame position to `/dock_position_world`, and the MPPI stack updates the cuRobo world obstacle pose from that stream.
 
 ## References
 

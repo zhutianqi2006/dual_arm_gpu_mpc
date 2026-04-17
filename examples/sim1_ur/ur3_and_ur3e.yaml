@@ -40,9 +40,9 @@ mppi_T: 15
 mppi_seed: 0
 batch_size: 1000
 mean: 0.0
-std: 1.732050808
+std: 3.0
 gamma: 2.0
-an_std: 0.774596669
+an_std: 1.0
 log_std: 0.1
 num_clusters: 6
 common_num: 3
@@ -63,7 +63,7 @@ q_vel_weight: 0.0
 stagnation_weight: 10.0
 #stagnation_weight: 8.0
 terminal_abs_weight: 100.0
-terminal_abs_position_weight: 20.0
+terminal_abs_position_weight: 100.0
 # high-level tradtition control parameters
 high_rel_gain: 0.02
 high_abs_gain: 2.0

@@ -1,0 +1,5 @@
+experiment_name: kmeans_adpan_smoke
+runtime:
+  device: cuda
+workspace:
+  kind: base

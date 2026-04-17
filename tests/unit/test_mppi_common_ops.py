@@ -5,6 +5,7 @@ from dual_arm_gpu_mpc.controllers.high_level.mppi.common_ops import (
     compute_weights,
     compute_weights_k,
     get_abs_cost,
+    get_current_vel,
     get_rel_jacobian_null,
     update_joint_position_with_limits,
 )
@@ -119,3 +120,15 @@ def test_get_rel_jacobian_null_returns_float32_batch_square_matrix():
     assert null.dtype == torch.float32
     assert torch.isfinite(null).all()
     torch.testing.assert_close(null[0], null[0].transpose(0, 1), atol=1e-5, rtol=1e-5)
+
+
+def test_get_current_vel_returns_contiguous_current_step_views():
+    robot1_seq = torch.arange(2 * 3 * 4, device="cuda:0", dtype=torch.float32).view(2, 3, 4)
+    robot2_seq = torch.arange(100, 100 + 2 * 3 * 5, device="cuda:0", dtype=torch.float32).view(2, 3, 5)
+
+    robot1_dq, robot2_dq = get_current_vel(robot1_seq, robot2_seq, 1)
+
+    assert robot1_dq.is_contiguous()
+    assert robot2_dq.is_contiguous()
+    torch.testing.assert_close(robot1_dq, robot1_seq[:, 1, :])
+    torch.testing.assert_close(robot2_dq, robot2_seq[:, 1, :])

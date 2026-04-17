@@ -4,14 +4,10 @@ import sys
 import math
 import pathlib
 from threading import Lock
-# pybullet to display
-# import pybullet as pyb
-# import pybullet_data
-# import pyb_utils
-# TIMESTEP = 1/60
 # ROS2
 import rclpy
 import rclpy.logging
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
@@ -36,6 +32,7 @@ class HighROSModule(Node):
         self.robot2_q_sub_topic = config.robot2_q_sub_topic
         # init high level u
         self.high_level_u_topic = config.high_level_u_topic
+        self.dynamic_obstacle_topic = config.dynamic_obstacle_topic
         self.obstacle_topic = "moving_obstacle"
         self.dynamic_obstacle = [1000.0, 0.0, 0.0]
         self.setup_ros2()
@@ -75,10 +72,9 @@ class HighROSModule(Node):
             self.obstacle_topic,
             1)
         # init obstacle subscriber
-        self.world_object_topic = "/dock_position_world"
         self.obstacle_sub = self.create_subscription(
             PointStamped,                      # ← 消息类型改为 PointStamped
-            self.world_object_topic,           # ← 话题改为 /dock_position_world
+            self.dynamic_obstacle_topic,
             self.obstacle_callback,            # ← 回调仍叫这个名，但签名变了
             10)
         
@@ -105,9 +101,11 @@ class HighROSModule(Node):
         self.dynamic_obstacle = [float(msg.point.x),
                                  float(msg.point.y),
                                  float(msg.point.z)]
-        print(self.dynamic_obstacle)
 
     def run(self):
-        rclpy.spin(self)
-        self.destroy_node()
-        rclpy.shutdown()
+        try:
+            rclpy.spin(self)
+        except (KeyboardInterrupt, ExternalShutdownException):
+            pass
+        finally:
+            self.destroy_node()

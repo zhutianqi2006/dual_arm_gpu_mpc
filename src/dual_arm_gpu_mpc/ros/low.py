@@ -4,14 +4,10 @@ import sys
 import math
 import pathlib
 from threading import Lock
-# pybullet to display
-# import pybullet as pyb
-# import pybullet_data
-# import pyb_utils
-# TIMESTEP = 1/60
 # ROS2
 import rclpy
 import rclpy.logging
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
@@ -157,9 +153,12 @@ class LowROSModule(Node):
         self.robot2_init_flag = True
     
     def run(self):
-        rclpy.spin(self)
-        self.destroy_node()
-        rclpy.shutdown()
+        try:
+            rclpy.spin(self)
+        except (KeyboardInterrupt, ExternalShutdownException):
+            pass
+        finally:
+            self.destroy_node()
 
 if __name__ == "__main__":
     os.environ['ROS_DOMAIN_ID'] = '16'

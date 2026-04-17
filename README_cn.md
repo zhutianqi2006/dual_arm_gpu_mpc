@@ -131,7 +131,7 @@ sudo apt install ros-humble-desktop
 source /opt/ros/humble/setup.bash
 ```
 
-当前仓库里像 `utils/mppi_adpan_module.py`、`utils/mppi_kmeans_adpan_module.py` 这类模块，即使 `curobo` 已经装好，如果没有 `rclpy` 仍然会在 import 阶段失败。
+当前仓库里像 `src/dual_arm_gpu_mpc/ros/high.py`、`src/dual_arm_gpu_mpc/ros/low.py`，以及 `src/dual_arm_gpu_mpc/controllers/` 下的 MPPI 入口模块，即使 `curobo` 已经装好，如果没有 `rclpy` 仍然会在 import 阶段失败。
 
 ## Conda 兜底方案
 
@@ -185,17 +185,26 @@ PY
 
 在 `examples/` 目录中，一般流程是：
 
+- `sim1_ur`：点到点任务，不做避障，作为基础场景
+- `sim2_ur`：静态障碍物避障
+- `sim3_ur`：动态障碍物避障，Bullet 中有真实移动的障碍物
+每个场景通常都按下面顺序运行：
+
 1. 先启动仿真环境
 2. 再启动底层控制器
 3. 最后启动高层控制器
 
-示例命令：
+以 `sim1_ur` 为例，命令如下：
 
 ```bash
-python bullet_robot_ros.py
-python low_level.py
-python mppi_xxxxx.py
+python examples/sim1_ur/bullet_robot_ros.py
+python examples/sim1_ur/low_level.py
+python examples/sim1_ur/mppi_kmeans_adpan.py
 ```
+
+需要开 3 个终端，并按这个顺序启动。`examples/sim2_ur`、`examples/sim3_ur` 和 `examples/exp1_ur` 也是同样的结构。
+
+`examples/sim3_ur` 是带动态障碍物的版本。它的 Bullet 场景里有一个名为 `moving_obstacle` 的长方体障碍物，会沿固定直线来回运动，并把世界坐标系下的位置发布到 `/dock_position_world`；MPPI 会用这个位置实时更新 cuRobo world 里的对应障碍物位姿。
 
 ## 参考项目
 

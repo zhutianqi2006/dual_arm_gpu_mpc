@@ -103,8 +103,8 @@ def get_proj_qd(
 
 @torch.jit.script
 def get_current_vel(robot1_dq_seq: torch.Tensor, robot2_dq_seq: torch.Tensor, i: int):
-    robot1_dq = robot1_dq_seq[:, i, :]
-    robot2_dq = robot2_dq_seq[:, i, :]
+    robot1_dq = robot1_dq_seq[:, i, :].contiguous()
+    robot2_dq = robot2_dq_seq[:, i, :].contiguous()
     return robot1_dq, robot2_dq
 
 

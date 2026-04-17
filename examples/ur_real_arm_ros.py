@@ -1,24 +1,43 @@
+from pathlib import Path
+import sys
+
+_EXAMPLE_PROJECT_ROOT = next(
+    (
+        candidate
+        for candidate in Path(__file__).resolve().parents
+        if (candidate / "pyproject.toml").exists() and (candidate / "src").is_dir()
+    ),
+    None,
+)
+if _EXAMPLE_PROJECT_ROOT is None:
+    raise RuntimeError("Unable to resolve dual_arm_gpu_mpc project root for example script.")
+_EXAMPLE_PROJECT_ROOT_STR = str(_EXAMPLE_PROJECT_ROOT)
+_EXAMPLE_SRC_ROOT_STR = str(_EXAMPLE_PROJECT_ROOT / "src")
+if _EXAMPLE_PROJECT_ROOT_STR not in sys.path:
+    sys.path.insert(0, _EXAMPLE_PROJECT_ROOT_STR)
+if _EXAMPLE_SRC_ROOT_STR not in sys.path:
+    sys.path.insert(0, _EXAMPLE_SRC_ROOT_STR)
+
+from dual_arm_gpu_mpc.common.example_bootstrap import bootstrap_example_paths
+
+bootstrap_example_paths(__file__)
 # Python standard lib
 import os
-import sys
-import math
-import pathlib
-from threading import Lock
 # pybullet to display
 import pybullet as pyb
 import pybullet_data
-import pyb_utils
 TIMESTEP = 0.00001
 # ROS2
 import rclpy
-import rclpy.logging
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64MultiArray
 import numpy as np
 # ur rtde
 import rtde_control
 import rtde_receive
+
+from dual_arm_gpu_mpc.common.paths import resolve_asset_path
+from dual_arm_gpu_mpc.common.pybullet_robot import BulletJointResetRobot
 
 class DualArmRealModel(Node):
     def __init__(self, dt: float = 0.01):
@@ -86,16 +105,19 @@ class DualArmRealModel(Node):
         # ground plane
         ground_id = pyb.loadURDF("plane.urdf", [0, 0, 0], useFixedBase=True, physicsClientId=client_id)
         dual_arm_robot_id = pyb.loadURDF(
-            "model/dual_arm_model/dual_arm_model.urdf",
+            str(resolve_asset_path("dual_arm_model/dual_arm_model.urdf")),
             [0, 0, 0],
             useFixedBase=True,
             physicsClientId=client_id
         )
-        dual_arm_robot = pyb_utils.Robot(dual_arm_robot_id, client_id=client_id)
+        dual_arm_robot = BulletJointResetRobot(dual_arm_robot_id, client_id=client_id, pybullet_module=pyb)
         # some cubes for obstacles
         # store body indices in a dict with more convenient key names
         cube2_id = pyb.loadURDF(
-            "model/plane/dynamic.urdf", [0.32, 0.22, 0.38], useFixedBase=True, physicsClientId=client_id
+            str(resolve_asset_path("plane/dynamic.urdf")),
+            [0.32, 0.22, 0.38],
+            useFixedBase=True,
+            physicsClientId=client_id
         )
         # store body indices in a dict with more convenient key names
         obstacles = {
